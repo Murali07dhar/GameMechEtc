@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,15 +9,12 @@
     <style>
         body {
             font-family: 'Roboto Mono', monospace;
-            overscroll-behavior: none;
-            overflow: hidden;
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars on the body */
         }
-        .dark body {
-            background-color: #111827;
-        }
-        #viewport {
-            width: 100%;
-            height: 100%;
+        #board-viewport {
+            width: 100vw;
+            height: 100vh;
             position: relative;
             overflow: hidden;
             cursor: grab;
@@ -26,41 +23,34 @@
                 linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
             background-size: 20px 20px;
-            transition: border 0.2s;
+            transition: border 0.2s; /* For drag-over effect */
         }
-        .dark #viewport {
-            background-color: #1F2937;
-             background-image:
-                linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-        }
-        #viewport.drag-over {
-            border: 3px dashed #fff;
-        }
-        #viewport:active {
+        #board-viewport:active {
             cursor: grabbing;
         }
         #evidence-board {
             position: absolute;
             top: 0;
             left: 0;
-            transform-origin: 0 0;
         }
         .item {
             position: absolute;
             cursor: move;
-            min-width: 100px;
-            min-height: 50px;
         }
         .note {
             font-family: 'Special Elite', cursive;
+            width: 200px;
+            min-width: 150px; /* Minimum size */
+            min-height: 100px; /* Minimum size */
             padding: 15px;
-            padding-bottom: 20px;
+            padding-bottom: 20px; /* Space for resizer */
             background-color: #fdf5d4;
             border: 1px solid #d3cba7;
             box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
-            display: flex;
+            transform-origin: center center;
+            display: flex; /* For textarea to fill height */
             flex-direction: column;
+            resize: none; /* Disable default textarea resize */
         }
         .note textarea {
             flex-grow: 1;
@@ -69,13 +59,33 @@
             resize: none;
             outline: none;
             font-family: inherit;
-            color: #333;
+            cursor: text;
+        }
+        .resizer {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            bottom: 0;
+            right: 0;
+            cursor: nwse-resize;
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(0,0,0,0.2),
+                rgba(0,0,0,0.2) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            z-index: 25;
         }
         .image-item {
             padding: 5px;
             background-color: #fff;
             border: 5px solid #fff;
             box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            width: 260px; /* Default width (250 for img + 10 for padding) */
+            min-width: 100px;
+            min-height: 80px;
+            resize: none;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -86,21 +96,6 @@
             object-fit: cover;
             display: block;
         }
-        .resizer {
-            position: absolute;
-            width: 15px;
-            height: 15px;
-            bottom: 0;
-            right: 0;
-            cursor: nwse-resize;
-            z-index: 25;
-        }
-        .note .resizer {
-             background: repeating-linear-gradient(-45deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2) 1px, transparent 1px, transparent 3px);
-        }
-         .image-item .resizer {
-             background: repeating-linear-gradient(-45deg, rgba(0,0,0,0.5), rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px);
-        }
         .connector-point {
             position: absolute;
             width: 12px;
@@ -109,73 +104,140 @@
             border-radius: 50%;
             border: 2px solid white;
             cursor: pointer;
-            display: none;
+            display: none; /* Initially hidden */
             z-index: 10;
         }
-        .item:hover .connector-point { display: block; }
+        .item:hover .connector-point {
+            display: block;
+        }
         .delete-btn {
             position: absolute;
-            top: -10px; right: -10px; width: 24px; height: 24px;
-            background-color: #d9534f; color: white; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Roboto Mono', monospace; font-weight: bold; font-size: 16px;
-            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.4); border: 2px solid white;
-            opacity: 0; transition: opacity 0.2s, transform 0.2s; transform: scale(0.8);
-            z-index: 20;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            background-color: #d9534f;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            border: 2px solid white;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.2s, transform 0.2s;
+            transform: scale(0.8);
+            z-index: 20; /* Ensure it's above connector points */
         }
-        .item:hover .delete-btn { opacity: 1; transform: scale(1); }
+        .item:hover .delete-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
         #connector-line-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allows clicks to go through to items below */
         }
-        .controls-panel {
-            background-color: rgba(255, 255, 255, 0.8);
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0,0,0,0.4);
             backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 100;
         }
-        .dark .controls-panel {
-             background-color: rgba(31, 41, 55, 0.8);
-             border-color: #374151;
+        .funky-btn {
+            font-family: 'Special Elite', cursive;
+            background-color: #fdf5d4;
+            color: #333;
+            border: 1px solid #d3cba7;
+            padding: 10px 15px;
+            border-radius: 3px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            cursor: grab;
+            transition: all 0.2s;
+            text-align: center;
         }
-        .dark .text-gray-700 { color: #D1D5DB; }
-        .dark #userInfo { background-color: #374151; color: #9CA3AF; }
+        .funky-btn:hover {
+            transform: scale(1.05) rotate(-1deg);
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.6);
+        }
+         .funky-btn:active {
+            cursor: grabbing;
+            transform: scale(1.02) rotate(1deg);
+        }
+        .modal-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        .modal-content {
+            background-color: #3a3a3a;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid #5a5a5a;
+            color: white;
+            text-align: center;
+        }
+        #note-drag-preview {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.7;
+        }
     </style>
 </head>
-<body class="h-screen w-screen overflow-hidden bg-gray-200 dark:bg-gray-900">
+<body>
 
-    <div id="viewport">
+    <div id="board-viewport">
         <div id="evidence-board">
             <!-- Items will be added here dynamically -->
         </div>
         <canvas id="connector-line-canvas"></canvas>
     </div>
 
-    <div class="absolute top-4 left-4 z-20 flex flex-col space-y-2 max-h-[90vh]">
-        <div class="controls-panel p-4 rounded-lg shadow border border-gray-200 flex flex-col space-y-2 overflow-y-auto">
-            <h2 class="font-bold text-gray-700 text-lg">Detective Board</h2>
-            <div id="userInfo" class="text-xs text-gray-500 bg-gray-100 p-2 rounded-md break-all">Connecting...</div>
-            <button id="add-note-btn" class="w-full px-4 py-2 bg-yellow-500 text-white font-semibold rounded-md hover:bg-yellow-600 transition-colors shadow-sm">Add Note</button>
-            <button id="add-image-btn" class="w-full px-4 py-2 bg-sky-500 text-white font-semibold rounded-md hover:bg-sky-600 transition-colors shadow-sm">Add Image</button>
-            <button id="toggleThemeBtn" class="w-full px-4 py-2 bg-indigo-500 text-white font-semibold rounded-md hover:bg-indigo-600 transition-colors shadow-sm">Toggle Theme</button>
-            <button id="clearBoardBtn" class="w-full px-4 py-2 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition-colors shadow-sm">Clear Board</button>
-        </div>
+    <div class="toolbar">
+        <div id="add-note-btn" class="funky-btn" style="transform: rotate(2deg);">Drag & Drop a Note</div>
+        <div id="add-image-btn" class="funky-btn" style="transform: rotate(-1.5deg);">Choose a Picture</div>
     </div>
     
-    <div id="image-url-modal" class="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4 hidden">
-        <div class="controls-panel p-6 rounded-lg shadow-xl w-full max-w-sm">
-            <h2 class="text-xl mb-4 font-bold text-gray-700">Add Image from URL</h2>
-            <input type="text" id="image-url-input" placeholder="Enter image URL" class="w-full p-2 rounded bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-4 text-gray-800 dark:text-gray-200">
-            <div class="flex justify-end space-x-2">
-                <button id="cancel-image-url" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded">Cancel</button>
-                <button id="submit-image-url" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded">Add Image</button>
+    <div id="image-url-modal" class="modal-bg hidden">
+        <div class="modal-content">
+            <h2 class="text-xl mb-4 font-bold font-sans">Add Image from URL</h2>
+            <input type="text" id="image-url-input" placeholder="Enter image URL" class="w-full p-2 rounded bg-gray-700 border border-gray-600 mb-4 text-white">
+            <div class="flex justify-end gap-2">
+                 <button id="cancel-image-url" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cancel</button>
+                 <button id="submit-image-url" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Add Image</button>
             </div>
         </div>
     </div>
 
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, query, where, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        
         // --- FIREBASE SETUP ---
         const firebaseConfig = {
             apiKey: "AIzaSyB9YpRiG49sfmPYnYc9jtp_W7A0G58jPNY",
@@ -187,293 +249,300 @@
         };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const auth = getAuth(app);
-        setLogLevel('error');
+        const itemsCol = collection(db, "items");
+        const connectionsCol = collection(db, "connections");
 
-        // --- UI ELEMENTS ---
-        const viewport = document.getElementById('viewport');
+        // --- DOM ELEMENTS ---
+        const viewport = document.getElementById('board-viewport');
         const board = document.getElementById('evidence-board');
         const canvas = document.getElementById('connector-line-canvas');
         const ctx = canvas.getContext('2d');
         
-        // --- GLOBAL STATE ---
-        let itemsCol, connectionsCol;
-        let localItems = new Map(); // Use a map for efficient updates
-        let localConnections = [];
+        // --- LOCAL STATE CACHE ---
+        let items = new Map();
+        let connections = new Map();
         
         // --- INTERACTION STATE ---
-        let activeAction = { type: null, target: null, startPos: {}, initialData: {} };
-        let view = { x: 0, y: 0, zoom: 1 };
-        let lineDrawingState = { active: false, startItemId: null };
-        
-        // --- COORDINATE UTILS ---
-        const screenToWorld = (x, y) => ({ x: (x / view.zoom) + view.x, y: (y / view.zoom) + view.y });
-        const worldToScreen = (x, y) => ({ x: (x - view.x) * view.zoom, y: (y - view.y) * view.zoom });
+        let activeItem = null;
+        let action = { type: null };
+        let pan = { x: 0, y: 0 };
+        let startPos = { x: 0, y: 0 };
+        let initialItemData = {};
+        let lineDrawingState = { active: false, startElementId: null, startPoint: null };
+        let isDraggingNewNote = false;
 
-        // --- RENDERING ---
-        function render() {
-            board.style.transform = `translate(${-view.x * view.zoom}px, ${-view.y * view.zoom}px) scale(${view.zoom})`;
+        // --- UTILITY ---
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        // --- CANVAS AND BOARD SETUP ---
+        function resizeCanvas() {
+            canvas.width = viewport.clientWidth;
+            canvas.height = viewport.clientHeight;
+            drawConnections();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        
+        function updateBoardTransform() {
+            board.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
             drawConnections();
         }
 
-        function drawConnections() {
-            canvas.width = viewport.clientWidth;
-            canvas.height = viewport.clientHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            localConnections.forEach(conn => {
-                const fromEl = document.getElementById(conn.from);
-                const toEl = document.getElementById(conn.to);
-                if (fromEl && toEl) {
-                    const fromRect = fromEl.getBoundingClientRect();
-                    const toRect = toEl.getBoundingClientRect();
-                    const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
-                    const toCenter = { x: toRect.left + toRect.width / 2, y: toRect.top + toRect.height / 2 };
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(fromCenter.x, fromCenter.y);
-                    ctx.lineTo(toCenter.x, toCenter.y);
-                    ctx.strokeStyle = 'rgba(200, 0, 0, 0.6)';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-            });
-        }
-
-        // --- ITEM MANAGEMENT ---
-        function createOrUpdateItemElement(item) {
-            let el = document.getElementById(item.id);
-            if (!el) {
-                el = document.createElement('div');
-                el.id = item.id;
-                el.classList.add('item');
-                board.appendChild(el);
-                setupItemEventListeners(el);
-            }
-
-            el.className = `item ${item.type === 'note' ? 'note' : 'image-item'}`;
-            el.style.left = `${item.x}px`;
-            el.style.top = `${item.y}px`;
-            el.style.width = `${item.width}px`;
-            el.style.height = `${item.height}px`;
-            el.style.zIndex = item.zIndex || 1;
-
-            let content = '';
-            if (item.type === 'note') {
-                content = `<textarea data-id="${item.id}">${item.content || ''}</textarea>`;
-            } else { // image
-                content = `<img src="${item.src}" draggable="false" alt="Evidence">`;
+        // --- ITEM CREATION & UPDATING (from Firebase data) ---
+        function createOrUpdateItem(itemData) {
+            let element = document.getElementById(itemData.id);
+            const isNew = !element;
+            if (isNew) {
+                element = document.createElement('div');
+                element.id = itemData.id;
+                board.appendChild(element);
             }
             
-            el.innerHTML = content + `
-                <div class="delete-btn" data-id="${item.id}">×</div>
-                <div class="resizer" data-id="${item.id}"></div>
-                <div class="connector-point" data-id="${item.id}" style="top: 50%; right: -6px; transform: translateY(-50%);"></div>
-                <div class="connector-point" data-id="${item.id}" style="top: 50%; left: -6px; transform: translateY(-50%);"></div>
-                <div class="connector-point" data-id="${item.id}" style="left: 50%; top: -6px; transform: translateX(-50%);"></div>
-                <div class="connector-point" data-id="${item.id}" style="left: 50%; bottom: -6px; transform: translateX(-50%);"></div>
-            `;
-        }
+            element.className = `${itemData.type} item`;
+            element.style.left = `${itemData.x}px`;
+            element.style.top = `${itemData.y}px`;
+            element.style.width = `${itemData.width}px`;
+            element.style.height = `${itemData.height}px`;
+            element.style.transform = `rotate(${itemData.rotation || 0}deg)`;
+            element.style.zIndex = itemData.zIndex || 1;
 
-        function setupItemEventListeners(el) {
-            // Event listeners will be delegated from the viewport
-        }
+            const activeTextarea = document.activeElement.tagName === 'TEXTAREA' ? document.activeElement : null;
+            const isCurrentlyEditingThis = activeTextarea && activeTextarea.dataset.id === itemData.id;
 
-        async function deleteItem(itemId) {
-            const batch = writeBatch(db);
-            batch.delete(doc(itemsCol, itemId));
-            const q = query(connectionsCol, where('from', '==', itemId));
-            const q2 = query(connectionsCol, where('to', '==', itemId));
-            const [snap1, snap2] = await Promise.all([getDocs(q), getDocs(q2)]);
-            snap1.forEach(d => batch.delete(d.ref));
-            snap2.forEach(d => batch.delete(d.ref));
-            await batch.commit();
+            if (isNew || !isCurrentlyEditingThis) {
+                let innerHTML = '';
+                if (itemData.type === 'note') {
+                    innerHTML = `<textarea data-id="${itemData.id}">${itemData.content || ''}</textarea>`;
+                } else if (itemData.type === 'image') {
+                    innerHTML = `<img src="${itemData.src}" alt="Evidence" draggable="false" onerror="this.onerror=null;this.src='https://placehold.co/250x150/ccc/000?text=Image+Not+Found';">`;
+                }
+
+                element.innerHTML = innerHTML + `
+                    <div class="delete-btn" data-id="${itemData.id}">×</div>
+                    <div class="resizer" data-id="${itemData.id}"></div>
+                    <div class="connector-point" data-id="${itemData.id}" data-point="right" style="top: 50%; right: -6px; transform: translateY(-50%);"></div>
+                    <div class="connector-point" data-id="${itemData.id}" data-point="left" style="top: 50%; left: -6px; transform: translateY(-50%);"></div>
+                    <div class="connector-point" data-id="${itemData.id}" data-point="top" style="left: 50%; top: -6px; transform: translateX(-50%);"></div>
+                    <div class="connector-point" data-id="${itemData.id}" data-point="bottom" style="left: 50%; bottom: -6px; transform: translateX(-50%);"></div>
+                `;
+            }
         }
 
         // --- REAL-TIME LISTENERS ---
-        function setupRealtimeListeners() {
-            itemsCol = collection(db, "evidence-items");
-            connectionsCol = collection(db, "evidence-connections");
-
-            onSnapshot(itemsCol, snapshot => {
-                const serverIds = new Set();
-                snapshot.docs.forEach(d => {
-                    const data = d.data();
-                    const id = d.id;
-                    serverIds.add(id);
-                    localItems.set(id, { id, ...data });
-                    createOrUpdateItemElement({ id, ...data });
-                });
-
-                // Remove items that were deleted on the server
-                localItems.forEach((_, id) => {
-                    if (!serverIds.has(id)) {
-                        document.getElementById(id)?.remove();
-                        localItems.delete(id);
-                    }
-                });
-                render();
+        onSnapshot(itemsCol, (snapshot) => {
+            const serverIds = new Set();
+            snapshot.docs.forEach(doc => {
+                const itemData = { id: doc.id, ...doc.data() };
+                serverIds.add(doc.id);
+                items.set(doc.id, itemData);
+                createOrUpdateItem(itemData);
             });
-
-            onSnapshot(connectionsCol, snapshot => {
-                localConnections = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                render();
+            items.forEach((_, id) => {
+                if (!serverIds.has(id)) {
+                    document.getElementById(id)?.remove();
+                    items.delete(id);
+                }
             });
-        }
+            drawConnections();
+        });
 
-        // --- EVENT HANDLERS ---
-        viewport.addEventListener('mousedown', e => {
-            if (e.button !== 0) return; // Only left click
+        onSnapshot(connectionsCol, (snapshot) => {
+            connections.clear();
+            snapshot.docs.forEach(doc => {
+                connections.set(doc.id, { id: doc.id, ...doc.data() });
+            });
+            drawConnections();
+        });
+
+        // --- INTERACTION LOGIC ---
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
             const target = e.target;
-            const worldPos = screenToWorld(e.clientX, e.clientY);
             
-            activeAction.startPos = { x: e.clientX, y: e.clientY, worldX: worldPos.x, worldY: worldPos.y };
+            if (target.closest('.toolbar, .modal-bg, textarea')) return;
+
+            startPos = { x: e.clientX, y: e.clientY };
+            
+            const itemElement = target.closest('.item');
 
             if (target.classList.contains('delete-btn')) {
                 deleteItem(target.dataset.id);
                 return;
             }
             if (target.classList.contains('connector-point')) {
-                const itemId = target.dataset.id;
+                const id = target.dataset.id;
+                const point = target.dataset.point;
                 if (!lineDrawingState.active) {
-                    lineDrawingState = { active: true, startItemId: itemId };
+                    lineDrawingState = { active: true, startElementId: id, startPoint: point };
                 } else {
-                    if (lineDrawingState.startItemId !== itemId) {
-                        addDoc(connectionsCol, { from: lineDrawingState.startItemId, to: itemId });
+                    if (lineDrawingState.startElementId !== id) {
+                        addDoc(connectionsCol, { 
+                            from: lineDrawingState.startElementId, 
+                            fromPoint: lineDrawingState.startPoint,
+                            to: id,
+                            toPoint: point
+                        });
                     }
                     lineDrawingState.active = false;
                 }
                 return;
             }
             if (target.classList.contains('resizer')) {
-                const itemId = target.dataset.id;
-                const item = localItems.get(itemId);
-                activeAction = { type: 'resize', target: item, startPos: activeAction.startPos, initialData: { width: item.width, height: item.height } };
+                const id = target.dataset.id;
+                activeItem = items.get(id);
+                action = { type: 'resize' };
+                initialItemData = { width: activeItem.width, height: activeItem.height };
                 return;
             }
-            const itemElement = target.closest('.item');
             if (itemElement) {
-                const itemId = itemElement.id;
-                const item = localItems.get(itemId);
-                activeAction = { type: 'drag', target: item, startPos: activeAction.startPos, initialData: { x: item.x, y: item.y } };
+                const id = itemElement.id;
+                activeItem = items.get(id);
+                action = { type: 'drag' };
+                initialItemData = { x: activeItem.x, y: activeItem.y };
+                const maxZ = Array.from(items.values()).reduce((max, i) => Math.max(max, i.zIndex || 0), 0);
+                updateDoc(doc(itemsCol, id), { zIndex: maxZ + 1 });
+                return;
+            }
+            
+            action = { type: 'pan' };
+            startPos = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDraggingNewNote) {
+                const preview = document.getElementById('note-drag-preview');
+                if (preview) {
+                    preview.style.left = `${e.clientX - 100}px`;
+                    preview.style.top = `${e.clientY - 50}px`;
+                }
+                return;
+            }
+            if (!action.type) return;
+            e.preventDefault();
+
+            if (action.type === 'pan') {
+                pan.x = e.clientX - startPos.x;
+                pan.y = e.clientY - startPos.y;
+                updateBoardTransform();
+            } else if (action.type === 'drag' && activeItem) {
+                const dx = e.clientX - startPos.x;
+                const dy = e.clientY - startPos.y;
+                const el = document.getElementById(activeItem.id);
+                el.style.left = `${initialItemData.x + dx}px`;
+                el.style.top = `${initialItemData.y + dy}px`;
+                drawConnections();
+            } else if (action.type === 'resize' && activeItem) {
+                const dx = e.clientX - startPos.x;
+                const dy = e.clientY - startPos.y;
+                const el = document.getElementById(activeItem.id);
+                el.style.width = `${Math.max(150, initialItemData.width + dx)}px`;
+                el.style.height = `${Math.max(100, initialItemData.height + dy)}px`;
+                drawConnections();
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (isDraggingNewNote) {
+                isDraggingNewNote = false;
+                const preview = document.getElementById('note-drag-preview');
+                if (preview) preview.remove();
                 
-                // Bring to front
-                const maxZ = Array.from(localItems.values()).reduce((max, i) => Math.max(max, i.zIndex || 0), 0);
-                updateDoc(doc(itemsCol, itemId), { zIndex: maxZ + 1 });
+                const x = e.clientX - pan.x - 100;
+                const y = e.clientY - pan.y - 50;
+
+                addDoc(itemsCol, {
+                    type: 'note', content: 'New Note...',
+                    x, y, width: 200, height: 100,
+                    rotation: Math.random() * 4 - 2, zIndex: 1
+                });
                 return;
             }
 
-            // If nothing else, pan
-            activeAction = { type: 'pan', target: null, startPos: activeAction.startPos, initialData: { x: view.x, y: view.y } };
-        });
-
-        viewport.addEventListener('mousemove', e => {
-            if (activeAction.type === null) return;
-            e.preventDefault();
-
-            const worldPos = screenToWorld(e.clientX, e.clientY);
-            const dx = (e.clientX - activeAction.startPos.x) / view.zoom;
-            const dy = (e.clientY - activeAction.startPos.y) / view.zoom;
-
-            switch (activeAction.type) {
-                case 'pan':
-                    view.x = activeAction.initialData.x - (e.clientX - activeAction.startPos.x) / view.zoom;
-                    view.y = activeAction.initialData.y - (e.clientY - activeAction.startPos.y) / view.zoom;
-                    break;
-                case 'drag':
-                    const newX = activeAction.initialData.x + dx;
-                    const newY = activeAction.initialData.y + dy;
-                    const el = document.getElementById(activeAction.target.id);
-                    if (el) {
-                        el.style.left = `${newX}px`;
-                        el.style.top = `${newY}px`;
-                        drawConnections();
-                    }
-                    break;
-                case 'resize':
-                    const newWidth = Math.max(100, activeAction.initialData.width + dx);
-                    const newHeight = Math.max(50, activeAction.initialData.height + dy);
-                    const resizeEl = document.getElementById(activeAction.target.id);
-                    if (resizeEl) {
-                        resizeEl.style.width = `${newWidth}px`;
-                        resizeEl.style.height = `${newHeight}px`;
-                        drawConnections();
-                    }
-                    break;
-            }
-            render();
-        });
-
-        viewport.addEventListener('mouseup', e => {
-            if (activeAction.type === 'drag') {
-                const dx = (e.clientX - activeAction.startPos.x) / view.zoom;
-                const dy = (e.clientY - activeAction.startPos.y) / view.zoom;
-                updateDoc(doc(itemsCol, activeAction.target.id), {
-                    x: activeAction.initialData.x + dx,
-                    y: activeAction.initialData.y + dy
-                });
-            } else if (activeAction.type === 'resize') {
-                const dx = (e.clientX - activeAction.startPos.x) / view.zoom;
-                const dy = (e.clientY - activeAction.startPos.y) / view.zoom;
-                updateDoc(doc(itemsCol, activeAction.target.id), {
-                    width: Math.max(100, activeAction.initialData.width + dx),
-                    height: Math.max(50, activeAction.initialData.height + dy)
+            if (action.type === 'drag' && activeItem) {
+                const dx = e.clientX - startPos.x;
+                const dy = e.clientY - startPos.y;
+                updateDoc(doc(itemsCol, activeItem.id), { x: initialItemData.x + dx, y: initialItemData.y + dy });
+            } else if (action.type === 'resize' && activeItem) {
+                const dx = e.clientX - startPos.x;
+                const dy = e.clientY - startPos.y;
+                updateDoc(doc(itemsCol, activeItem.id), { 
+                    width: Math.max(150, initialItemData.width + dx), 
+                    height: Math.max(100, initialItemData.height + dy) 
                 });
             }
-            activeAction.type = null;
+            action.type = null;
+            activeItem = null;
         });
 
-        viewport.addEventListener('wheel', e => {
-            e.preventDefault();
-            const mousePos = { x: e.clientX, y: e.clientY };
-            const worldPosBeforeZoom = screenToWorld(mousePos.x, mousePos.y);
-            
-            const zoomFactor = e.deltaY < 0 ? 1.1 : 1/1.1;
-            view.zoom = Math.max(0.1, Math.min(5, view.zoom * zoomFactor));
+        // --- DEBOUNCED TEXT EDITING ---
+        const debouncedUpdate = debounce((id, content) => {
+            updateDoc(doc(itemsCol, id), { content: content });
+        }, 500);
 
-            const worldPosAfterZoom = screenToWorld(mousePos.x, mousePos.y);
-            view.x += worldPosBeforeZoom.x - worldPosAfterZoom.x;
-            view.y += worldPosBeforeZoom.y - worldPosAfterZoom.y;
-            render();
-        });
-
-        // Textarea live updates
-        viewport.addEventListener('input', e => {
+        board.addEventListener('input', (e) => {
             if (e.target.tagName === 'TEXTAREA') {
-                const id = e.target.dataset.id;
-                updateDoc(doc(itemsCol, id), { content: e.target.value });
+                debouncedUpdate(e.target.dataset.id, e.target.value);
             }
         });
 
-        // Drag and drop from desktop
-        viewport.addEventListener('dragover', e => { e.preventDefault(); viewport.classList.add('drag-over'); });
-        viewport.addEventListener('dragleave', e => { viewport.classList.remove('drag-over'); });
-        viewport.addEventListener('drop', e => {
-            e.preventDefault();
-            viewport.classList.remove('drag-over');
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = readEvent => {
-                    const worldPos = screenToWorld(e.clientX, e.clientY);
-                    addDoc(itemsCol, {
-                        type: 'image', src: readEvent.target.result,
-                        x: worldPos.x - 130, y: worldPos.y - 100,
-                        width: 260, height: 200, zIndex: 1
-                    });
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // --- CONTROLS ---
-        document.getElementById('add-note-btn').addEventListener('click', () => {
-            const worldPos = screenToWorld(viewport.clientWidth / 2, viewport.clientHeight / 2);
-            addDoc(itemsCol, {
-                type: 'note', content: 'New Note',
-                x: worldPos.x - 100, y: worldPos.y - 50,
-                width: 200, height: 100, zIndex: 1
+        function drawConnections() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            connections.forEach(conn => {
+                const fromEl = document.getElementById(conn.from);
+                const toEl = document.getElementById(conn.to);
+                if (fromEl && toEl) {
+                    const fromPointEl = fromEl.querySelector(`.connector-point[data-point="${conn.fromPoint}"]`);
+                    const toPointEl = toEl.querySelector(`.connector-point[data-point="${conn.toPoint}"]`);
+                    
+                    if (fromPointEl && toPointEl) {
+                        const fromRect = fromPointEl.getBoundingClientRect();
+                        const toRect = toPointEl.getBoundingClientRect();
+                        const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
+                        const toCenter = { x: toRect.left + toRect.width / 2, y: toRect.top + toRect.height / 2 };
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(fromCenter.x, fromCenter.y);
+                        ctx.lineTo(toCenter.x, toCenter.y);
+                        ctx.strokeStyle = 'rgba(200, 0, 0, 0.7)';
+                        ctx.lineWidth = 4; // Increased line width
+                        ctx.stroke();
+                    }
+                }
             });
+        }
+        
+        async function deleteItem(itemId) {
+            const batch = writeBatch(db);
+            batch.delete(doc(itemsCol, itemId));
+            
+            const qFrom = query(connectionsCol, where("from", "==", itemId));
+            const qTo = query(connectionsCol, where("to", "==", itemId));
+            
+            const [fromSnap, toSnap] = await Promise.all([getDocs(qFrom), getDocs(qTo)]);
+            fromSnap.forEach(d => batch.delete(d.ref));
+            toSnap.forEach(d => batch.delete(d.ref));
+            
+            await batch.commit();
+        }
+
+        // --- TOOLBAR CONTROLS ---
+        document.getElementById('add-note-btn').addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isDraggingNewNote = true;
+            const preview = document.createElement('div');
+            preview.id = 'note-drag-preview';
+            preview.className = 'note';
+            preview.style.width = '200px';
+            preview.style.height = '100px';
+            preview.style.left = `${e.clientX - 100}px`;
+            preview.style.top = `${e.clientY - 50}px`;
+            document.body.appendChild(preview);
         });
 
         const imageUrlModal = document.getElementById('image-url-modal');
@@ -482,46 +551,21 @@
         document.getElementById('submit-image-url').addEventListener('click', () => {
             const url = document.getElementById('image-url-input').value;
             if (url) {
-                const worldPos = screenToWorld(viewport.clientWidth / 2, viewport.clientHeight / 2);
+                const x = (viewport.clientWidth / 2) - 130 - pan.x;
+                const y = (viewport.clientHeight / 2) - 100 - pan.y;
                 addDoc(itemsCol, {
                     type: 'image', src: url,
-                    x: worldPos.x - 130, y: worldPos.y - 100,
-                    width: 260, height: 200, zIndex: 1
+                    x, y, width: 260, height: 190,
+                    rotation: Math.random() * 4 - 2, zIndex: 1
                 });
                 imageUrlModal.classList.add('hidden');
                 document.getElementById('image-url-input').value = '';
             }
         });
 
-        document.getElementById('toggleThemeBtn').addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-        });
-
-        document.getElementById('clearBoardBtn').addEventListener('click', async () => {
-            if (confirm('Are you sure you want to clear the entire board? This cannot be undone.')) {
-                const batch = writeBatch(db);
-                const [itemsSnap, connsSnap] = await Promise.all([getDocs(itemsCol), getDocs(connectionsCol)]);
-                itemsSnap.forEach(d => batch.delete(d.ref));
-                connsSnap.forEach(d => batch.delete(d.ref));
-                await batch.commit();
-            }
-        });
-
-        // --- INITIALIZATION ---
-        function init() {
-            onAuthStateChanged(auth, user => {
-                if (user) {
-                    document.getElementById('userInfo').textContent = `User: ${user.uid.substring(0, 8)}`;
-                    setupRealtimeListeners();
-                } else {
-                    signInAnonymously(auth).catch(err => console.error("Auth Error", err));
-                }
-            });
-            window.addEventListener('resize', render);
-            render();
-        }
-
-        init();
+        // --- INITIALIZE ---
+        resizeCanvas();
+        updateBoardTransform();
     </script>
 </body>
 </html>
