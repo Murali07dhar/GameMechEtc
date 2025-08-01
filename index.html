@@ -173,6 +173,7 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // Your web app's Firebase configuration
@@ -187,8 +188,15 @@
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
         const evidenceCol = collection(db, 'evidence');
+
+        // Sign in user anonymously to get permissions
+        signInAnonymously(auth).catch((error) => {
+            console.error("Anonymous sign-in failed:", error);
+            alert("Could not connect to the collaborative session. Please check your Firebase security rules.");
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             const noteTemplate = document.getElementById('note-template');
@@ -331,6 +339,7 @@
                 
                 // Add event listeners
                 item.addEventListener('mousedown', onMoveStart);
+                item.addEventListener('dblclick', onDeleteItem);
                 item.querySelector('.rotate-handle').addEventListener('mousedown', onRotateStart);
                 
                 const contentDiv = item.querySelector('.note-content');
@@ -357,6 +366,14 @@
             }
 
             // --- Interaction Handlers ---
+
+            function onDeleteItem(e) {
+                const itemEl = e.currentTarget;
+                if (confirm('Are you sure you want to delete this item?')) {
+                    const docRef = doc(db, 'evidence', itemEl.id);
+                    deleteDoc(docRef);
+                }
+            }
 
             function onMoveStart(e) {
                 if (e.target.isContentEditable || e.target.classList.contains('rotate-handle')) {
