@@ -3,673 +3,451 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Detective Evidence Board</title>
+    <title>Detective Evidence Board</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+    <link href="https://css.gg/css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles for the evidence board */
-        body {
+        /* Custom font for a typewriter/handwritten feel */
+        .font-special-elite {
             font-family: 'Special Elite', monospace;
-            background-color: #1a1a1a;
         }
-        #evidence-board {
-            background-image: url('https://www.transparenttextures.com/patterns/cork-wallet.png');
-            background-color: #6B4F3A;
-            width: 100%;
-            height: 90vh;
-            position: relative;
-            overflow: hidden;
-            border: 12px solid #3a2d22;
-            border-radius: 4px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7), inset 0 0 15px rgba(0,0,0,0.5);
+
+        /* Black background for the board */
+        .corkboard-bg {
+            background-color: #111827; /* A dark, near-black color */
         }
-        .note {
+
+        /* Base styling for all evidence items */
+        .evidence-item {
             position: absolute;
-            width: 220px;
-            height: 180px;
-            background-color: #fdf9e0;
-            box-shadow: 3px 3px 5px rgba(0,0,0,0.4);
-            padding: 20px 15px 15px 15px;
-            cursor: move;
-            display: flex;
-            flex-direction: column;
-            border-radius: 2px;
-            transition: all 0.2s ease-in-out;
-            border: 2px solid transparent;
-            z-index: 5;
-        }
-        .note.selected {
-            border-color: #3b82f6;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
-            z-index: 20 !important;
-        }
-        .note::before {
-            content: '';
-            position: absolute;
-            top: 5px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 15px;
-            height: 15px;
-            background: radial-gradient(circle, #ff5252, #c62828);
-            border-radius: 50%;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
-            z-index: 1;
-        }
-        .note:hover {
-            transform: scale(1.05) rotate(0deg) !important;
             z-index: 10;
+            width: 260px;
+            min-height: 120px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.4);
+            cursor: move; /* Indicates the item is movable */
+            transition: box-shadow 0.2s ease-out, transform 0.1s ease-out;
+            resize: both;
+            overflow: hidden; /* Hides resize handle overflow */
         }
-        .note textarea {
-            width: 100%;
-            height: 100%;
-            background: transparent;
-            border: none;
-            resize: none;
-            outline: none;
-            font-family: inherit;
-            font-size: 16px;
-            color: #333;
+        
+        /* Specific styling for note items */
+        .note-item {
+            padding: 0.75rem;
+            padding-top: 1.5rem; /* Adjusted for pin */
+            background-color: #fefcbf; /* A yellowish paper color */
+            color: #000;
+            border-radius: 2px;
+            border-left: 5px solid #b91c1c; /* A deep red border */
         }
-        .note .delete-btn, .note .connect-btn {
-            position: absolute;
-            top: -12px;
-            right: -12px;
-            background: #ef4444;
-            color: white;
-            border: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 14px;
-            z-index: 2;
+        
+        /* Specific styling for photo items (polaroid style) */
+        .photo-item {
+            padding: 1rem;
+            padding-top: 1.5rem; /* Adjusted for pin */
+            padding-bottom: 3rem; /* More space at the bottom for the polaroid look */
+            background-color: #f8fafc; /* Off-white */
+            border-radius: 1px;
         }
-        .note:hover .delete-btn, .note:hover .connect-btn {
-            display: flex;
-        }
-        .note .connect-btn {
-            right: 18px;
-            background: #3b82f6;
-        }
-        .note-image {
+
+        .photo-item .photo-content {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            border-radius: 2px;
+            background-color: #374151; /* gray-700 for image placeholder */
+            border: 1px solid #4b5563; /* gray-600 */
         }
-        #connector-canvas {
+        
+        /* Style for the draggable note template in the toolbar */
+        #note-template {
+            cursor: grab;
+            transition: transform 0.2s ease-in-out;
+            transform: rotate(-2deg);
+        }
+        #note-template:hover {
+            transform: rotate(-2deg) scale(1.05);
+        }
+        #note-template:active {
+            cursor: grabbing;
+            transform: scale(0.95) rotate(0deg);
+        }
+
+        /* Visual feedback when dragging over the board */
+        .drag-over {
+            background-color: rgba(0,0,0,0.2);
+            box-shadow: inset 0 0 0 4px #b91c1c;
+        }
+
+        /* Class for an item being dragged */
+        .dragging {
+            z-index: 1000; /* Bring to front */
+            box-shadow: 10px 10px 15px rgba(0,0,0,0.5);
+            opacity: 0.85;
+            cursor: grabbing;
+            transform-origin: center center;
+        }
+
+        /* Blue pushpin styling */
+        .pin {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: -5px; /* Lowered the pin slightly */
+            left: 50%;
+            transform: translateX(-50%); /* Only center horizontally */
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #93c5fd 0%, #3b82f6 100%); /* light blue to medium blue */
+            border-radius: 50%;
+            border: 1px solid #1e40af; /* dark blue */
+            box-shadow: 0 2px 3px rgba(0,0,0,0.6), inset 0 0 4px rgba(255,255,255,0.4);
+            z-index: 11;
+        }
+
+        /* General rotation handle styling */
+        .rotate-handle {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 50%;
+            cursor: alias;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 12;
+            transition: background-color 0.2s;
+        }
+        .rotate-handle:hover {
+            background-color: rgba(0,0,0,0.4);
+        }
+        .rotate-handle svg {
+            width: 14px;
+            height: 14px;
+            color: black;
+            pointer-events: none; /* Make sure handle itself captures events */
+        }
+        
+        /* Specific override for photo item rotate handle */
+        .photo-item .rotate-handle {
+            right: auto;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .drop-hint {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: rgba(255,255,255,0.2);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
             pointer-events: none;
-            z-index: 0;
-        }
-        .loading {
-            color: #fbbf24;
-        }
-        .error {
-            color: #ef4444;
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-4">
-    <h1 class="text-5xl text-gray-200 font-bold mb-4 tracking-widest text-shadow-lg">CLASSIFIED</h1>
-    <div class="mb-4 flex items-center gap-6">
-        <button id="add-note-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition-transform transform hover:scale-105 cursor-grab">
-            Add Evidence (Drag Me)
-        </button>
-        <span class="text-gray-300">USER ID: <strong id="user-id-display" class="text-yellow-400 tracking-wider">Loading...</strong></span>
-        <span id="connection-status" class="text-gray-300">Status: <span class="loading">Connecting...</span></span>
-    </div>
-    <div id="evidence-board" class="w-full">
-        <canvas id="connector-canvas"></canvas>
-    </div>
+<body class="bg-gray-900 font-sans antialiased overflow-hidden h-screen flex flex-col">
+
+    <!-- Header & Toolbar -->
+    <header class="bg-black/50 backdrop-blur-sm text-white p-3 shadow-lg z-30 flex justify-between items-center border-b border-gray-700">
+        <h1 class="text-xl md:text-2xl font-bold font-special-elite tracking-wider">CASE FILE: UNASSIGNED</h1>
+        <div class="flex items-center space-x-4">
+            <span class="text-gray-400 font-semibold text-sm">DRAG TO BOARD:</span>
+            <!-- Draggable Note Template -->
+            <div id="note-template" draggable="true" class="p-2 bg-yellow-100 text-red-800 font-bold uppercase text-xs rounded-sm shadow-md text-center w-32 border-l-4 border-red-800">
+                Field Note
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Evidence Board Area -->
+    <main id="board-container" class="relative flex-grow overflow-hidden">
+        <div id="corkboard" class="absolute inset-0 corkboard-bg">
+             <div class="drop-hint">Drag & drop images from your computer here</div>
+            <!-- Dropped evidence items will be added here by JavaScript -->
+        </div>
+    </main>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // --- Firebase Configuration ---
-        const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? 
-            JSON.parse(window.__firebase_config) : 
-            {
-                apiKey: "demo-key",
-                authDomain: "demo-project.firebaseapp.com",
-                projectId: "demo-project"
-            };
-        
-        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-evidence-board';
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBIQBvbJP8QvbJvplG4oo7SbSpI9o5oEkQ",
+            authDomain: "storyplannerv3.firebaseapp.com",
+            projectId: "storyplannerv3",
+            storageBucket: "storyplannerv3.appspot.com",
+            messagingSenderId: "36866781156",
+            appId: "1:36866781156:web:2b1dd18e2593905036e1f1"
+        };
 
-        let app, db, auth;
-        let userId = null;
-        let notesCollection, connectionsCollection;
-        let unsubscribeNotes, unsubscribeConnections;
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const evidenceCol = collection(db, 'evidence');
 
-        // --- Initialize Firebase ---
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            updateStatus('Initializing...', 'loading');
-        } catch (error) {
-            console.error("Firebase initialization error:", error);
-            updateStatus('Connection Failed', 'error');
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const noteTemplate = document.getElementById('note-template');
+            const corkboard = document.getElementById('corkboard');
 
-        function updateStatus(message, type = '') {
-            const statusEl = document.getElementById('connection-status');
-            const statusSpan = statusEl.querySelector('span');
-            statusSpan.textContent = message;
-            statusSpan.className = type;
-        }
+            // --- Global State for Interactions ---
+            let activeItem = null;
+            let action = null; // 'move', 'rotate'
+            let offset = { x: 0, y: 0, angle: 0 };
+            
+            // --- Real-time listener for Firestore ---
+            onSnapshot(evidenceCol, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const itemData = change.doc.data();
+                    const itemId = change.doc.id;
+                    let itemEl = document.getElementById(itemId);
 
-        // --- Authentication ---
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userId = user.uid;
-                document.getElementById('user-id-display').textContent = userId.substring(0, 8) + '...';
-                
-                notesCollection = collection(db, `artifacts/${appId}/public/data/notes`);
-                connectionsCollection = collection(db, `artifacts/${appId}/public/data/connections`);
-                
-                updateStatus('Connected', 'text-green-400');
-                initializeBoard();
-            } else {
-                try {
-                    updateStatus('Authenticating...', 'loading');
-                    if (typeof window.__initial_auth_token !== 'undefined') {
-                        await signInWithCustomToken(auth, window.__initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
+                    if (change.type === 'added') {
+                        if (!itemEl) { // Make sure we don't re-add our own items
+                           if (itemData.type === 'note') {
+                                createNoteOnBoard(itemId, itemData);
+                           } else if (itemData.type === 'image') {
+                                createImageOnBoard(itemId, itemData);
+                           }
+                        }
                     }
-                } catch (error) {
-                    console.error("Authentication Error:", error);
-                    updateStatus('Auth Failed', 'error');
-                }
-            }
-        });
+                    if (change.type === 'modified') {
+                        if (itemEl) {
+                           updateItemOnBoard(itemEl, itemData);
+                        }
+                    }
+                    if (change.type === 'removed') {
+                        if (itemEl) {
+                            itemEl.remove();
+                        }
+                    }
+                });
+            });
 
-        const board = document.getElementById('evidence-board');
-        const addNoteBtn = document.getElementById('add-note-btn');
-        const canvas = document.getElementById('connector-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        let isDragging = false;
-        let activeNote = null;
-        let offsetX, offsetY;
-        let isConnecting = false;
-        let startConnectionNodeId = null;
-        let notes = new Map();
-        let connections = new Map();
 
-        // --- Board and Canvas Sizing ---
-        function resizeCanvas() {
-            const rect = board.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            drawAllConnections();
-        }
-        
-        window.addEventListener('resize', debounce(resizeCanvas, 100));
-        
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
+            // --- Drag and Drop Handling ---
 
-        // --- Note Creation ---
-        async function createNoteElement(noteData) {
-            const noteEl = document.createElement('div');
-            noteEl.className = 'note';
-            noteEl.id = noteData.id;
+            noteTemplate.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', 'note');
+            });
+
+            corkboard.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                corkboard.classList.add('drag-over');
+            });
             
-            // Ensure position is within board bounds
-            const maxX = board.clientWidth - 220;
-            const maxY = board.clientHeight - 180;
-            const x = Math.max(0, Math.min(noteData.x || 50, maxX));
-            const y = Math.max(0, Math.min(noteData.y || 50, maxY));
-            
-            noteEl.style.left = `${x}px`;
-            noteEl.style.top = `${y}px`;
-            
-            const rotation = noteData.rotation || (Math.random() * 8 - 4);
-            noteEl.style.transform = `rotate(${rotation}deg)`;
-            
-            if (!noteData.rotation && userId) {
-                try {
-                    await setDoc(doc(notesCollection, noteData.id), { rotation }, { merge: true });
-                } catch (error) {
-                    console.error("Error updating rotation:", error);
-                }
-            }
+            corkboard.addEventListener('dragleave', () => {
+                corkboard.classList.remove('drag-over');
+            });
 
-            if (noteData.type === 'text') {
-                const textarea = document.createElement('textarea');
-                textarea.value = noteData.content || '';
-                textarea.placeholder = "Jot down a clue...";
-                textarea.addEventListener('input', debounce((e) => {
-                    updateNoteContent(noteData.id, e.target.value);
-                }, 300));
-                noteEl.appendChild(textarea);
-            } else if (noteData.type === 'image') {
-                const img = document.createElement('img');
-                img.src = noteData.content;
-                img.className = 'note-image';
-                img.onerror = () => {
-                    img.alt = 'Failed to load image';
-                    img.style.background = '#f3f4f6';
-                };
-                noteEl.appendChild(img);
-            }
+            corkboard.addEventListener('drop', (e) => {
+                e.preventDefault();
+                corkboard.classList.remove('drag-over');
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.innerHTML = '&times;';
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.onclick = (e) => {
-                e.stopPropagation();
-                deleteNote(noteData.id);
-            };
-            noteEl.appendChild(deleteBtn);
-            
-            const connectBtn = document.createElement('button');
-            connectBtn.innerHTML = '&#128279;';
-            connectBtn.className = 'connect-btn';
-            connectBtn.onclick = (e) => {
-                e.stopPropagation();
-                startConnection(noteData.id);
-            };
-            noteEl.appendChild(connectBtn);
+                const boardRect = corkboard.getBoundingClientRect();
+                const x = e.clientX - boardRect.left - 130;
+                const y = e.clientY - boardRect.top - 60;
+                const rotation = Math.random() * 8 - 4;
 
-            noteEl.addEventListener('mousedown', startDrag);
-            noteEl.addEventListener('click', handleNoteClick);
-
-            return noteEl;
-        }
-        
-        // --- Note Selection Logic ---
-        function selectNote(noteElement) {
-            const currentlySelected = document.querySelector('.note.selected');
-            if (currentlySelected) {
-                currentlySelected.classList.remove('selected');
-            }
-            if (noteElement) {
-                noteElement.classList.add('selected');
-            }
-        }
-
-        board.addEventListener('click', (e) => {
-            if (e.target === board || e.target === canvas) {
-                selectNote(null);
-                if (isConnecting) {
-                    isConnecting = false;
-                    startConnectionNodeId = null;
-                    board.style.cursor = 'default';
-                }
-            }
-        });
-
-        // --- Drag and Drop Logic ---
-        function startDrag(e) {
-            if (e.target.tagName === 'TEXTAREA' || 
-                e.target.classList.contains('delete-btn') || 
-                e.target.classList.contains('connect-btn')) return;
-            
-            isDragging = true;
-            activeNote = e.currentTarget;
-            selectNote(activeNote);
-            
-            const rect = board.getBoundingClientRect();
-            offsetX = e.clientX - rect.left - activeNote.offsetLeft;
-            offsetY = e.clientY - rect.top - activeNote.offsetTop;
-            
-            document.addEventListener('mousemove', drag);
-            document.addEventListener('mouseup', stopDrag);
-            e.preventDefault();
-        }
-
-        function drag(e) {
-            if (!isDragging || !activeNote) return;
-            e.preventDefault();
-            
-            const rect = board.getBoundingClientRect();
-            const newX = Math.max(0, Math.min(e.clientX - rect.left - offsetX, board.clientWidth - 220));
-            const newY = Math.max(0, Math.min(e.clientY - rect.top - offsetY, board.clientHeight - 180));
-            
-            activeNote.style.left = `${newX}px`;
-            activeNote.style.top = `${newY}px`;
-            drawAllConnections();
-        }
-
-        async function stopDrag() {
-            if (isDragging && activeNote && userId) {
-                try {
-                    const noteId = activeNote.id;
-                    const newX = parseInt(activeNote.style.left, 10);
-                    const newY = parseInt(activeNote.style.top, 10);
-                    await updateNotePosition(noteId, newX, newY);
-                } catch (error) {
-                    console.error("Error updating position:", error);
-                }
-            }
-            isDragging = false;
-            activeNote = null;
-            document.removeEventListener('mousemove', drag);
-            document.removeEventListener('mouseup', stopDrag);
-        }
-
-        // --- Connection Logic ---
-        function startConnection(noteId) {
-            isConnecting = true;
-            startConnectionNodeId = noteId;
-            board.style.cursor = 'crosshair';
-        }
-
-        async function handleNoteClick(e) {
-            const clickedNote = e.currentTarget;
-            if (isConnecting && startConnectionNodeId) {
-                const endConnectionNodeId = clickedNote.id;
-                if (startConnectionNodeId !== endConnectionNodeId) {
-                    try {
-                        const ids = [startConnectionNodeId, endConnectionNodeId].sort();
-                        const connectionId = `${ids[0]}-${ids[1]}`;
-                        await setDoc(doc(connectionsCollection, connectionId), { 
-                            from: startConnectionNodeId, 
-                            to: endConnectionNodeId 
+                // Check for dropped files first
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleFileDrop(e.dataTransfer.files, x, y, rotation);
+                    e.dataTransfer.clearData();
+                } else {
+                    const dataType = e.dataTransfer.getData('text/plain');
+                    if (dataType === 'note') {
+                        addDoc(evidenceCol, {
+                            type: 'note',
+                            text: 'Enter observation...',
+                            x: x,
+                            y: y,
+                            rotation: rotation,
+                            width: 260,
+                            height: 120
                         });
-                    } catch (error) {
-                        console.error("Error creating connection:", error);
                     }
                 }
-                isConnecting = false;
-                startConnectionNodeId = null;
-                board.style.cursor = 'default';
-            } else {
-                selectNote(clickedNote);
+            });
+            
+            function handleFileDrop(files, x, y, rotation) {
+                for (const file of files) {
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (loadEvent) => {
+                             addDoc(evidenceCol, {
+                                type: 'image',
+                                src: loadEvent.target.result,
+                                x: x,
+                                y: y,
+                                rotation: rotation,
+                                width: 260,
+                                height: 300
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
             }
-        }
 
-        // --- Firestore Interactions ---
-        async function updateNotePosition(id, x, y) {
-            if (!userId) return;
-            try {
-                await setDoc(doc(notesCollection, id), { x, y }, { merge: true });
-            } catch (error) {
-                console.error("Error updating note position:", error);
-            }
-        }
-        
-        async function updateNoteContent(id, content) {
-            if (!userId) return;
-            try {
-                await setDoc(doc(notesCollection, id), { content }, { merge: true });
-            } catch (error) {
-                console.error("Error updating note content:", error);
-            }
-        }
-
-        async function deleteNote(id) {
-            if (!userId) return;
-            try {
-                const q1 = query(connectionsCollection, where("from", "==", id));
-                const q2 = query(connectionsCollection, where("to", "==", id));
-                const [querySnapshot1, querySnapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+            // --- Item Creation and Update Functions ---
+            
+            function createNoteOnBoard(id, data) {
+                const note = document.createElement('div');
+                note.className = 'evidence-item note-item';
+                note.id = id;
                 
-                const deletePromises = [];
-                querySnapshot1.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
-                querySnapshot2.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
-                await Promise.all(deletePromises);
-                await deleteDoc(doc(notesCollection, id));
-            } catch (error) {
-                console.error("Error deleting note:", error);
+                note.innerHTML = `
+                    <div class="pin"></div>
+                    <div class="font-special-elite note-content" contenteditable="true">${data.text}</div>
+                    <div class="rotate-handle">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.667 0L2.985 7.352" /></svg>
+                    </div>
+                `;
+                setupNewItem(note, data);
             }
-        }
-        
-        // --- Drag-to-Add New Note Logic ---
-        let ghostNote = null;
-
-        addNoteBtn.addEventListener('mousedown', (e) => {
-            if (!userId) return;
-            e.preventDefault();
-
-            ghostNote = document.createElement('div');
-            ghostNote.className = 'note';
-            ghostNote.style.position = 'fixed';
-            ghostNote.style.opacity = '0.7';
-            ghostNote.style.pointerEvents = 'none';
-            ghostNote.style.zIndex = '1000';
-            ghostNote.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 24px;">📄</div>';
-            document.body.appendChild(ghostNote);
-
-            moveGhostNote(e);
-
-            document.addEventListener('mousemove', moveGhostNote);
-            document.addEventListener('mouseup', dropNote);
-        });
-
-        function moveGhostNote(e) {
-            if (ghostNote) {
-                ghostNote.style.left = `${e.clientX - 110}px`;
-                ghostNote.style.top = `${e.clientY - 90}px`;
+            
+            function createImageOnBoard(id, data) {
+                const photo = document.createElement('div');
+                photo.className = 'evidence-item photo-item';
+                photo.id = id;
+                
+                photo.innerHTML = `
+                    <div class="pin"></div>
+                    <img src="${data.src}" class="photo-content" alt="Dropped Evidence"/>
+                    <div class="rotate-handle">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.667 0L2.985 7.352" /></svg>
+                    </div>
+                `;
+                setupNewItem(photo, data);
             }
-        }
 
-        async function dropNote(e) {
-            document.removeEventListener('mousemove', moveGhostNote);
-            document.removeEventListener('mouseup', dropNote);
-
-            if (ghostNote) {
-                const boardRect = board.getBoundingClientRect();
-                if (
-                    e.clientX >= boardRect.left && e.clientX <= boardRect.right &&
-                    e.clientY >= boardRect.top && e.clientY <= boardRect.bottom
-                ) {
-                    try {
-                        const noteId = `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                        const noteData = {
-                            id: noteId,
-                            x: Math.max(0, Math.min(e.clientX - boardRect.left - 110, board.clientWidth - 220)),
-                            y: Math.max(0, Math.min(e.clientY - boardRect.top - 90, board.clientHeight - 180)),
-                            content: '',
-                            type: 'text',
-                            owner: userId,
-                            rotation: Math.random() * 8 - 4,
-                            created: Date.now()
-                        };
-                        await setDoc(doc(notesCollection, noteId), noteData);
-                    } catch (error) {
-                        console.error("Error creating note:", error);
-                    }
+            function setupNewItem(item, data) {
+                updateItemOnBoard(item, data);
+                corkboard.appendChild(item);
+                
+                // Add event listeners
+                item.addEventListener('mousedown', onMoveStart);
+                item.querySelector('.rotate-handle').addEventListener('mousedown', onRotateStart);
+                
+                const contentDiv = item.querySelector('.note-content');
+                if (contentDiv) {
+                    contentDiv.addEventListener('blur', (e) => {
+                        const docRef = doc(db, 'evidence', item.id);
+                        updateDoc(docRef, { text: e.target.innerHTML });
+                    });
                 }
-                ghostNote.remove();
-                ghostNote = null;
             }
-        }
-
-        // --- Real-time Listeners ---
-        function initializeBoard() {
-            resizeCanvas();
-            listenForNotes();
-            listenForConnections();
-        }
-
-        function listenForNotes() {
-            if (unsubscribeNotes) unsubscribeNotes();
             
-            unsubscribeNotes = onSnapshot(notesCollection, (snapshot) => {
-                snapshot.docChanges().forEach(async (change) => {
-                    const noteData = { id: change.doc.id, ...change.doc.data() };
-                    const noteId = noteData.id;
+            function updateItemOnBoard(item, data) {
+                 item.style.left = `${data.x}px`;
+                item.style.top = `${data.y}px`;
+                item.style.width = `${data.width}px`;
+                item.style.height = `${data.height}px`;
+                item.style.transform = `rotate(${data.rotation}deg)`;
+                item.dataset.rotation = data.rotation;
 
-                    if (change.type === "added") {
-                        if (!document.getElementById(noteId)) {
-                            try {
-                                const noteEl = await createNoteElement(noteData);
-                                board.appendChild(noteEl);
-                                notes.set(noteId, noteData);
-                            } catch (error) {
-                                console.error("Error creating note element:", error);
-                            }
-                        }
-                    }
-                    if (change.type === "modified") {
-                        let noteEl = document.getElementById(noteId);
-                        if (noteEl && noteEl !== activeNote) {
-                            noteEl.style.left = `${noteData.x}px`;
-                            noteEl.style.top = `${noteData.y}px`;
-                            if (noteData.type === 'text') {
-                                const textarea = noteEl.querySelector('textarea');
-                                if (textarea && document.activeElement !== textarea) {
-                                    textarea.value = noteData.content || '';
-                                }
-                            }
-                        }
-                        notes.set(noteId, noteData);
-                    }
-                    if (change.type === "removed") {
-                        let noteEl = document.getElementById(noteId);
-                        if (noteEl) {
-                            noteEl.remove();
-                            notes.delete(noteId);
-                        }
-                    }
-                });
-                drawAllConnections();
-            }, (error) => {
-                console.error("Notes listener error:", error);
-                updateStatus('Notes Sync Error', 'error');
-            });
-        }
-        
-        function listenForConnections() {
-            if (unsubscribeConnections) unsubscribeConnections();
-            
-            unsubscribeConnections = onSnapshot(connectionsCollection, (snapshot) => {
-                connections.clear();
-                snapshot.forEach(doc => {
-                    connections.set(doc.id, doc.data());
-                });
-                drawAllConnections();
-            }, (error) => {
-                console.error("Connections listener error:", error);
-            });
-        }
-        
-        function drawAllConnections() {
-            if (!ctx) return;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            connections.forEach(conn => {
-                const fromNode = document.getElementById(conn.from);
-                const toNode = document.getElementById(conn.to);
-
-                if (fromNode && toNode) {
-                    const boardRect = board.getBoundingClientRect();
-                    const fromRect = fromNode.getBoundingClientRect();
-                    const toRect = toNode.getBoundingClientRect();
-
-                    const startX = fromRect.left - boardRect.left + fromRect.width / 2;
-                    const startY = fromRect.top - boardRect.top + fromRect.height / 2;
-                    const endX = toRect.left - boardRect.left + toRect.width / 2;
-                    const endY = toRect.top - boardRect.top + toRect.height / 2;
-
-                    ctx.beginPath();
-                    ctx.moveTo(startX, startY);
-                    ctx.lineTo(endX, endY);
-                    ctx.strokeStyle = '#c62828';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([]);
-                    ctx.stroke();
+                const contentDiv = item.querySelector('.note-content');
+                if (contentDiv && contentDiv.innerHTML !== data.text) {
+                    contentDiv.innerHTML = data.text;
                 }
-            });
-        }
+            }
 
-        // --- Image Drop ---
-        board.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            board.style.filter = 'brightness(1.1)';
-        });
-        
-        board.addEventListener('dragleave', () => {
-            board.style.filter = 'brightness(1)';
-        });
-        
-        board.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            board.style.filter = 'brightness(1)';
-            
-            if (!userId) return;
-            
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    try {
-                        const noteId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                        const boardRect = board.getBoundingClientRect();
-                        const noteData = {
-                            id: noteId,
-                            x: Math.max(0, Math.min(e.clientX - boardRect.left - 110, board.clientWidth - 220)),
-                            y: Math.max(0, Math.min(e.clientY - boardRect.top - 90, board.clientHeight - 180)),
-                            content: event.target.result,
-                            type: 'image',
-                            owner: userId,
-                            rotation: Math.random() * 8 - 4,
-                            created: Date.now()
-                        };
-                        await setDoc(doc(notesCollection, noteId), noteData);
-                    } catch (error) {
-                        console.error("Error creating image note:", error);
-                    }
+            // --- Interaction Handlers ---
+
+            function onMoveStart(e) {
+                if (e.target.isContentEditable || e.target.classList.contains('rotate-handle')) {
+                    return;
+                }
+                e.preventDefault();
+                
+                activeItem = e.currentTarget;
+                action = 'move';
+                activeItem.classList.add('dragging');
+                
+                offset = {
+                    x: e.clientX - activeItem.getBoundingClientRect().left,
+                    y: e.clientY - activeItem.getBoundingClientRect().top,
+                    angle: parseFloat(activeItem.dataset.rotation || 0)
                 };
-                reader.readAsDataURL(file);
-            }
-        });
 
-        // --- Keyboard Delete ---
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (document.activeElement.tagName !== 'TEXTAREA') {
-                    const selectedNote = document.querySelector('.note.selected');
-                    if (selectedNote) {
-                        e.preventDefault();
-                        deleteNote(selectedNote.id);
-                    }
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+
+            function onRotateStart(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                activeItem = e.currentTarget.parentElement;
+                action = 'rotate';
+                activeItem.classList.add('dragging');
+                
+                const rect = activeItem.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                const currentRotation = parseFloat(activeItem.dataset.rotation || 0);
+
+                offset = { angle: startAngle - currentRotation };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+            
+            function onMouseMove(e) {
+                if (!activeItem) return;
+
+                if (action === 'move') {
+                    const boardRect = corkboard.getBoundingClientRect();
+                    let x = e.clientX - boardRect.left - offset.x;
+                    let y = e.clientY - boardRect.top - offset.y;
+
+                    x = Math.max(0, Math.min(x, boardRect.width - activeItem.offsetWidth));
+                    y = Math.max(0, Math.min(y, boardRect.height - activeItem.offsetHeight));
+
+                    activeItem.style.left = `${x}px`;
+                    activeItem.style.top = `${y}px`;
+                    activeItem.style.transform = `rotate(${offset.angle}deg) scale(1.05)`;
+
+                } else if (action === 'rotate') {
+                    const rect = activeItem.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    
+                    const moveAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                    const newRotation = moveAngle - offset.angle;
+                    
+                    activeItem.dataset.rotation = newRotation;
+                    activeItem.style.transform = `rotate(${newRotation}deg) scale(1.05)`;
                 }
             }
-            if (e.key === 'Escape') {
-                if (isConnecting) {
-                    isConnecting = false;
-                    startConnectionNodeId = null;
-                    board.style.cursor = 'default';
+
+            function onMouseUp() {
+                if (activeItem) {
+                    activeItem.classList.remove('dragging');
+                    const finalRotation = parseFloat(activeItem.dataset.rotation || 0);
+                    activeItem.style.transform = `rotate(${finalRotation}deg)`;
+                    
+                    const docRef = doc(db, 'evidence', activeItem.id);
+                    updateDoc(docRef, {
+                        x: parseFloat(activeItem.style.left),
+                        y: parseFloat(activeItem.style.top),
+                        rotation: finalRotation,
+                        width: activeItem.offsetWidth,
+                        height: activeItem.offsetHeight
+                    });
                 }
-                selectNote(null);
+                activeItem = null;
+                action = null;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
             }
         });
-
-        // --- Cleanup on page unload ---
-        window.addEventListener('beforeunload', () => {
-            if (unsubscribeNotes) unsubscribeNotes();
-            if (unsubscribeConnections) unsubscribeConnections();
-        });
-
     </script>
 </body>
 </html>
