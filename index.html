@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://css.gg/css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         /* Custom font for a typewriter/handwritten feel */
@@ -15,9 +14,11 @@
             font-family: 'Special Elite', monospace;
         }
 
-        /* Black background for the board */
+        /* Dark gray background for the board */
         .corkboard-bg {
-            background-color: #111827; /* A dark, near-black color */
+            background-color: #1f2937; /* gray-800 */
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 0);
+            background-size: 20px 20px;
         }
 
         /* Base styling for all evidence items */
@@ -31,6 +32,7 @@
             transition: box-shadow 0.2s ease-out, transform 0.1s ease-out;
             resize: both;
             overflow: hidden; /* Hides resize handle overflow */
+            border: 1px solid rgba(0,0,0,0.2);
         }
         
         /* Specific styling for note items */
@@ -92,9 +94,9 @@
         /* Blue pushpin styling */
         .pin {
             position: absolute;
-            top: -5px; /* Lowered the pin slightly */
+            top: -5px;
             left: 50%;
-            transform: translateX(-50%); /* Only center horizontally */
+            transform: translateX(-50%);
             width: 20px;
             height: 20px;
             background: radial-gradient(circle, #93c5fd 0%, #3b82f6 100%); /* light blue to medium blue */
@@ -140,11 +142,15 @@
         .drop-hint {
             position: absolute;
             top: 1rem;
-            left: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
             color: rgba(255,255,255,0.2);
             font-family: 'Inter', sans-serif;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             pointer-events: none;
+            background-color: rgba(0,0,0,0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
         }
     </style>
 </head>
@@ -152,9 +158,9 @@
 
     <!-- Header & Toolbar -->
     <header class="bg-black/50 backdrop-blur-sm text-white p-3 shadow-lg z-30 flex justify-between items-center border-b border-gray-700">
-        <h1 class="text-xl md:text-2xl font-bold font-special-elite tracking-wider">CASE FILE: UNASSIGNED</h1>
+        <h1 class="text-xl md:text-2xl font-bold font-special-elite tracking-wider">CASE FILE: COLLABORATIVE</h1>
         <div class="flex items-center space-x-4">
-            <span class="text-gray-400 font-semibold text-sm">DRAG TO BOARD:</span>
+            <span class="text-gray-400 font-semibold text-sm hidden md:inline">DRAG TO BOARD:</span>
             <!-- Draggable Note Template -->
             <div id="note-template" draggable="true" class="p-2 bg-yellow-100 text-red-800 font-bold uppercase text-xs rounded-sm shadow-md text-center w-32 border-l-4 border-red-800">
                 Field Note
@@ -170,74 +176,127 @@
         </div>
     </main>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-bold text-gray-900">Delete Item?</h3>
+            <p class="mt-2 text-sm text-gray-600">Are you sure you want to permanently delete this evidence? This action cannot be undone.</p>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="cancel-delete" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">Cancel</button>
+                <button id="confirm-delete" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
-        // Import Firebase modules
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // Import Firebase modules from the latest version
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBIQBvbJP8QvbJvplG4oo7SbSpI9o5oEkQ",
-            authDomain: "storyplannerv3.firebaseapp.com",
-            projectId: "storyplannerv3",
-            storageBucket: "storyplannerv3.appspot.com",
-            messagingSenderId: "36866781156",
-            appId: "1:36866781156:web:2b1dd18e2593905036e1f1"
-        };
+        // --- Firebase Initialization ---
+        let db, auth, evidenceCol;
+        let itemToDelete = null;
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const evidenceCol = collection(db, 'evidence');
+        // Debounce utility to prevent spamming Firestore with updates during resize
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
 
-        // Sign in user anonymously to get permissions
-        signInAnonymously(auth).catch((error) => {
-            console.error("Anonymous sign-in failed:", error);
-            alert("Could not connect to the collaborative session. Please check your Firebase security rules.");
-        });
+        async function initializeFirebase() {
+            try {
+                // Use environment variables provided by the platform
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'detective-board-default';
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const noteTemplate = document.getElementById('note-template');
+                if (!firebaseConfig.apiKey) {
+                    console.error("Firebase config is missing. App cannot connect to the database.");
+                    alert("Firebase configuration is missing. The board cannot be loaded.");
+                    return;
+                }
+                
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Enable debug logging for Firestore
+                setLogLevel('debug');
+
+                // Authenticate the user
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Authenticated user with UID:", auth.currentUser.uid);
+
+                // Set up the collection reference AFTER authentication
+                evidenceCol = collection(db, `artifacts/${appId}/public/data/evidence`);
+                
+                // Start the real-time listener
+                setupRealtimeListener();
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                alert("Could not connect to the collaborative session. Please check your Firebase configuration and security rules.");
+            }
+        }
+
+
+        // --- Global State for Interactions ---
+        let activeItem = null;
+        let action = null; // 'move', 'rotate'
+        let offset = { x: 0, y: 0, angle: 0 };
+        
+        // --- Real-time listener for Firestore ---
+        function setupRealtimeListener() {
             const corkboard = document.getElementById('corkboard');
-
-            // --- Global State for Interactions ---
-            let activeItem = null;
-            let action = null; // 'move', 'rotate'
-            let offset = { x: 0, y: 0, angle: 0 };
-            
-            // --- Real-time listener for Firestore ---
             onSnapshot(evidenceCol, (snapshot) => {
+                console.log("Received snapshot with", snapshot.docChanges().length, "changes.");
                 snapshot.docChanges().forEach((change) => {
                     const itemData = change.doc.data();
                     const itemId = change.doc.id;
                     let itemEl = document.getElementById(itemId);
 
                     if (change.type === 'added') {
-                        if (!itemEl) { // Make sure we don't re-add our own items
-                           if (itemData.type === 'note') {
+                        if (!itemEl) { // Prevent re-adding an item we just created locally
+                            console.log(`Adding item: ${itemId}`);
+                            if (itemData.type === 'note') {
                                 createNoteOnBoard(itemId, itemData);
-                           } else if (itemData.type === 'image') {
+                            } else if (itemData.type === 'image') {
                                 createImageOnBoard(itemId, itemData);
-                           }
+                            }
                         }
                     }
                     if (change.type === 'modified') {
-                        if (itemEl) {
-                           updateItemOnBoard(itemEl, itemData);
+                        if (itemEl && document.activeElement !== itemEl.querySelector('[contenteditable]')) {
+                            console.log(`Modifying item: ${itemId}`);
+                            updateItemOnBoard(itemEl, itemData);
                         }
                     }
                     if (change.type === 'removed') {
                         if (itemEl) {
+                            console.log(`Removing item: ${itemId}`);
                             itemEl.remove();
                         }
                     }
                 });
+            }, (error) => {
+                console.error("Error with Firestore snapshot listener:", error);
+                alert("Lost connection to the database. Please refresh the page.");
             });
+        }
 
 
-            // --- Drag and Drop Handling ---
+        // --- Drag and Drop Handling ---
+        function initializeDragAndDrop() {
+            const noteTemplate = document.getElementById('note-template');
+            const corkboard = document.getElementById('corkboard');
 
             noteTemplate.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', 'note');
@@ -257,9 +316,9 @@
                 corkboard.classList.remove('drag-over');
 
                 const boardRect = corkboard.getBoundingClientRect();
-                const x = e.clientX - boardRect.left - 130;
+                const x = e.clientX - boardRect.left - 130; // Center the drop
                 const y = e.clientY - boardRect.top - 60;
-                const rotation = Math.random() * 8 - 4;
+                const rotation = Math.random() * 8 - 4; // -4 to +4 degrees
 
                 // Check for dropped files first
                 if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -276,194 +335,236 @@
                             rotation: rotation,
                             width: 260,
                             height: 120
-                        });
+                        }).catch(error => console.error("Failed to add note:", error));
                     }
                 }
             });
+        }
+        
+        function handleFileDrop(files, x, y, rotation) {
+            for (const file of files) {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (loadEvent) => {
+                        addDoc(evidenceCol, {
+                            type: 'image',
+                            src: loadEvent.target.result,
+                            x: x,
+                            y: y,
+                            rotation: rotation,
+                            width: 260,
+                            height: 300
+                        }).catch(error => console.error("Failed to add image:", error));
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        }
+
+        // --- Item Creation and Update Functions ---
+        
+        function createNoteOnBoard(id, data) {
+            const note = document.createElement('div');
+            note.className = 'evidence-item note-item';
+            note.id = id;
             
-            function handleFileDrop(files, x, y, rotation) {
-                for (const file of files) {
-                    if (file.type.startsWith('image/')) {
-                        const reader = new FileReader();
-                        reader.onload = (loadEvent) => {
-                             addDoc(evidenceCol, {
-                                type: 'image',
-                                src: loadEvent.target.result,
-                                x: x,
-                                y: y,
-                                rotation: rotation,
-                                width: 260,
-                                height: 300
-                            });
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                }
-            }
-
-            // --- Item Creation and Update Functions ---
+            note.innerHTML = `
+                <div class="pin"></div>
+                <div class="font-special-elite note-content" contenteditable="true">${data.text}</div>
+                <div class="rotate-handle">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.667 0L2.985 7.352" /></svg>
+                </div>
+            `;
+            setupNewItem(note, data);
+        }
+        
+        function createImageOnBoard(id, data) {
+            const photo = document.createElement('div');
+            photo.className = 'evidence-item photo-item';
+            photo.id = id;
             
-            function createNoteOnBoard(id, data) {
-                const note = document.createElement('div');
-                note.className = 'evidence-item note-item';
-                note.id = id;
-                
-                note.innerHTML = `
-                    <div class="pin"></div>
-                    <div class="font-special-elite note-content" contenteditable="true">${data.text}</div>
-                    <div class="rotate-handle">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.667 0L2.985 7.352" /></svg>
-                    </div>
-                `;
-                setupNewItem(note, data);
-            }
+            photo.innerHTML = `
+                <div class="pin"></div>
+                <img src="${data.src}" class="photo-content" alt="Dropped Evidence" draggable="false"/>
+                <div class="rotate-handle">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.667 0L2.985 7.352" /></svg>
+                </div>
+            `;
+            setupNewItem(photo, data);
+        }
+
+        function setupNewItem(item, data) {
+            const corkboard = document.getElementById('corkboard');
+            updateItemOnBoard(item, data);
+            corkboard.appendChild(item);
             
-            function createImageOnBoard(id, data) {
-                const photo = document.createElement('div');
-                photo.className = 'evidence-item photo-item';
-                photo.id = id;
-                
-                photo.innerHTML = `
-                    <div class="pin"></div>
-                    <img src="${data.src}" class="photo-content" alt="Dropped Evidence"/>
-                    <div class="rotate-handle">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.667 0L2.985 7.352" /></svg>
-                    </div>
-                `;
-                setupNewItem(photo, data);
-            }
-
-            function setupNewItem(item, data) {
-                updateItemOnBoard(item, data);
-                corkboard.appendChild(item);
-                
-                // Add event listeners
-                item.addEventListener('mousedown', onMoveStart);
-                item.addEventListener('dblclick', onDeleteItem);
-                item.querySelector('.rotate-handle').addEventListener('mousedown', onRotateStart);
-                
-                const contentDiv = item.querySelector('.note-content');
-                if (contentDiv) {
-                    contentDiv.addEventListener('blur', (e) => {
-                        const docRef = doc(db, 'evidence', item.id);
-                        updateDoc(docRef, { text: e.target.innerHTML });
-                    });
-                }
-            }
+            // Add event listeners for interactions
+            item.addEventListener('mousedown', onMoveStart);
+            item.addEventListener('dblclick', onDeleteRequest);
+            item.querySelector('.rotate-handle').addEventListener('mousedown', onRotateStart);
             
-            function updateItemOnBoard(item, data) {
-                 item.style.left = `${data.x}px`;
-                item.style.top = `${data.y}px`;
-                item.style.width = `${data.width}px`;
-                item.style.height = `${data.height}px`;
-                item.style.transform = `rotate(${data.rotation}deg)`;
-                item.dataset.rotation = data.rotation;
-
-                const contentDiv = item.querySelector('.note-content');
-                if (contentDiv && contentDiv.innerHTML !== data.text) {
-                    contentDiv.innerHTML = data.text;
-                }
+            // Listener for text edits
+            const contentDiv = item.querySelector('.note-content');
+            if (contentDiv) {
+                contentDiv.addEventListener('blur', (e) => {
+                    const docRef = doc(db, evidenceCol.path, item.id);
+                    updateDoc(docRef, { text: e.target.innerHTML })
+                        .catch(error => console.error("Failed to update text:", error));
+                });
             }
 
-            // --- Interaction Handlers ---
+            // Create a debounced save function for this specific item
+            const debouncedSave = debounce((el) => {
+                console.log(`Saving resize for ${el.id}`);
+                const docRef = doc(db, evidenceCol.path, el.id);
+                updateDoc(docRef, {
+                    width: el.offsetWidth,
+                    height: el.offsetHeight
+                }).catch(error => console.error("Failed to save resize:", error));
+            }, 500);
 
-            function onDeleteItem(e) {
-                const itemEl = e.currentTarget;
-                if (confirm('Are you sure you want to delete this item?')) {
-                    const docRef = doc(db, 'evidence', itemEl.id);
-                    deleteDoc(docRef);
-                }
+            // Use ResizeObserver to save dimensions when resizing stops
+            const observer = new ResizeObserver(() => {
+                debouncedSave(item);
+            });
+            observer.observe(item);
+        }
+        
+        function updateItemOnBoard(item, data) {
+            item.style.left = `${data.x}px`;
+            item.style.top = `${data.y}px`;
+            item.style.width = `${data.width}px`;
+            item.style.height = `${data.height}px`;
+            item.style.transform = `rotate(${data.rotation}deg)`;
+            item.dataset.rotation = data.rotation;
+
+            const contentDiv = item.querySelector('.note-content');
+            if (contentDiv && contentDiv.innerHTML !== data.text) {
+                contentDiv.innerHTML = data.text;
             }
+        }
 
-            function onMoveStart(e) {
-                if (e.target.isContentEditable || e.target.classList.contains('rotate-handle')) {
-                    return;
-                }
-                e.preventDefault();
-                
-                activeItem = e.currentTarget;
-                action = 'move';
-                activeItem.classList.add('dragging');
-                
-                offset = {
-                    x: e.clientX - activeItem.getBoundingClientRect().left,
-                    y: e.clientY - activeItem.getBoundingClientRect().top,
-                    angle: parseFloat(activeItem.dataset.rotation || 0)
-                };
+        // --- Interaction Handlers ---
 
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+        function onDeleteRequest(e) {
+            itemToDelete = e.currentTarget;
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        function confirmDeletion() {
+            if (itemToDelete) {
+                const docRef = doc(db, evidenceCol.path, itemToDelete.id);
+                deleteDoc(docRef)
+                    .then(() => console.log(`Successfully deleted ${itemToDelete.id}`))
+                    .catch(error => console.error("Failed to delete item:", error));
             }
+            closeDeleteModal();
+        }
 
-            function onRotateStart(e) {
-                e.preventDefault();
-                e.stopPropagation();
+        function closeDeleteModal() {
+            itemToDelete = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
 
-                activeItem = e.currentTarget.parentElement;
-                action = 'rotate';
-                activeItem.classList.add('dragging');
-                
+        function onMoveStart(e) {
+            // Ignore clicks on content, handles, or if it's not the primary mouse button
+            if (e.button !== 0 || e.target.isContentEditable || e.target.classList.contains('rotate-handle')) {
+                return;
+            }
+            e.preventDefault();
+            
+            activeItem = e.currentTarget;
+            action = 'move';
+            activeItem.classList.add('dragging');
+            
+            offset = {
+                x: e.clientX - activeItem.getBoundingClientRect().left,
+                y: e.clientY - activeItem.getBoundingClientRect().top,
+                angle: parseFloat(activeItem.dataset.rotation || 0)
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function onRotateStart(e) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            activeItem = e.currentTarget.parentElement;
+            action = 'rotate';
+            activeItem.classList.add('dragging');
+            
+            const rect = activeItem.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+            const currentRotation = parseFloat(activeItem.dataset.rotation || 0);
+
+            offset = { angle: startAngle - currentRotation };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+        
+        function onMouseMove(e) {
+            if (!activeItem) return;
+
+            if (action === 'move') {
+                const boardRect = corkboard.getBoundingClientRect();
+                let x = e.clientX - boardRect.left - offset.x;
+                let y = e.clientY - boardRect.top - offset.y;
+
+                // Constrain to board
+                x = Math.max(0, Math.min(x, boardRect.width - activeItem.offsetWidth));
+                y = Math.max(0, Math.min(y, boardRect.height - activeItem.offsetHeight));
+
+                activeItem.style.left = `${x}px`;
+                activeItem.style.top = `${y}px`;
+                activeItem.style.transform = `rotate(${offset.angle}deg) scale(1.02)`;
+
+            } else if (action === 'rotate') {
                 const rect = activeItem.getBoundingClientRect();
                 const centerX = rect.left + rect.width / 2;
                 const centerY = rect.top + rect.height / 2;
                 
-                const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-                const currentRotation = parseFloat(activeItem.dataset.rotation || 0);
-
-                offset = { angle: startAngle - currentRotation };
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+                const moveAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                const newRotation = moveAngle - offset.angle;
+                
+                activeItem.dataset.rotation = newRotation;
+                activeItem.style.transform = `rotate(${newRotation}deg) scale(1.02)`;
             }
-            
-            function onMouseMove(e) {
-                if (!activeItem) return;
+        }
 
-                if (action === 'move') {
-                    const boardRect = corkboard.getBoundingClientRect();
-                    let x = e.clientX - boardRect.left - offset.x;
-                    let y = e.clientY - boardRect.top - offset.y;
-
-                    x = Math.max(0, Math.min(x, boardRect.width - activeItem.offsetWidth));
-                    y = Math.max(0, Math.min(y, boardRect.height - activeItem.offsetHeight));
-
-                    activeItem.style.left = `${x}px`;
-                    activeItem.style.top = `${y}px`;
-                    activeItem.style.transform = `rotate(${offset.angle}deg) scale(1.05)`;
-
-                } else if (action === 'rotate') {
-                    const rect = activeItem.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
-                    
-                    const moveAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-                    const newRotation = moveAngle - offset.angle;
-                    
-                    activeItem.dataset.rotation = newRotation;
-                    activeItem.style.transform = `rotate(${newRotation}deg) scale(1.05)`;
-                }
+        function onMouseUp() {
+            if (activeItem) {
+                activeItem.classList.remove('dragging');
+                const finalRotation = parseFloat(activeItem.dataset.rotation || 0);
+                activeItem.style.transform = `rotate(${finalRotation}deg)`;
+                
+                const docRef = doc(db, evidenceCol.path, activeItem.id);
+                updateDoc(docRef, {
+                    x: parseFloat(activeItem.style.left),
+                    y: parseFloat(activeItem.style.top),
+                    rotation: finalRotation,
+                    width: activeItem.offsetWidth,
+                    height: activeItem.offsetHeight
+                }).catch(error => console.error("Failed to update item on mouse up:", error));
             }
+            activeItem = null;
+            action = null;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
 
-            function onMouseUp() {
-                if (activeItem) {
-                    activeItem.classList.remove('dragging');
-                    const finalRotation = parseFloat(activeItem.dataset.rotation || 0);
-                    activeItem.style.transform = `rotate(${finalRotation}deg)`;
-                    
-                    const docRef = doc(db, 'evidence', activeItem.id);
-                    updateDoc(docRef, {
-                        x: parseFloat(activeItem.style.left),
-                        y: parseFloat(activeItem.style.top),
-                        rotation: finalRotation,
-                        width: activeItem.offsetWidth,
-                        height: activeItem.offsetHeight
-                    });
-                }
-                activeItem = null;
-                action = null;
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-            }
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFirebase();
+            initializeDragAndDrop();
+            document.getElementById('confirm-delete').addEventListener('click', confirmDeletion);
+            document.getElementById('cancel-delete').addEventListener('click', closeDeleteModal);
         });
     </script>
 </body>
