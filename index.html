@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detective Notebox Board</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -156,59 +155,67 @@
     </style>
 </head>
 <body class="w-screen h-screen m-0 p-0">
-    <div id="board" class="w-full h-full">
-        <div id="pan-container">
-            <svg id="connections-svg"></svg>
+    <!-- Main UI: Hidden by default -->
+    <div id="mainUI" style="display:none">
+        <div id="board" class="w-full h-full">
+            <div id="pan-container">
+                <svg id="connections-svg"></svg>
+            </div>
         </div>
-    </div>
-    <div id="controls" class="absolute top-4 left-4 z-20 bg-gray-800/80 backdrop-blur-sm text-white p-4 rounded-lg shadow-2xl border border-gray-600 flex flex-col space-y-3">
-        <h1 class="text-3xl text-center text-yellow-300">Controls</h1>
-        <div id="userInfo" class="text-xs text-center bg-gray-700 p-2 rounded-md break-all">Connecting...</div>
-        <button id="googleSignInBtn" style="display:none" class="px-4 py-2 bg-green-500 text-white font-bold rounded-md hover:bg-green-600 transition-transform transform hover:scale-105 shadow-lg">Sign in with Google</button>
-        <button id="addNoteBtn" class="px-4 py-2 bg-yellow-400 text-gray-900 font-bold rounded-md hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg cursor-grab">Add Notebox</button>
-        <button id="connectModeBtn" class="px-4 py-2 bg-red-500 text-white font-bold rounded-md hover:bg-red-600 transition-transform transform hover:scale-105 shadow-lg">Connect Notebox</button>
-        <button id="deleteConnectionBtn" class="px-4 py-2 bg-purple-500 text-white font-bold rounded-md hover:bg-purple-600 transition-transform transform hover:scale-105 shadow-lg">Delete Connection</button>
-        <button id="deleteModeBtn" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-md hover:bg-gray-700 transition-transform transform hover:scale-105 shadow-lg">Delete Notebox</button>
-        <button id="toggleThemeBtn" class="px-4 py-2 bg-indigo-500 text-white font-bold rounded-md hover:bg-indigo-600 transition-transform transform hover:scale-105 shadow-lg">Toggle Theme</button>
-        <button id="clearBoardBtn" class="px-4 py-2 bg-blue-500 text-white font-bold rounded-md hover:bg-blue-600 transition-transform transform hover:scale-105 shadow-lg">Clear Board</button>
-        <div id="loading" style="display:block" class="text-xs text-center bg-gray-700 p-2 mt-2 rounded-md break-all">Checking authentication...</div>
-    </div>
-    <div id="message-box" class="hidden absolute bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-lg shadow-xl z-30">
-        <p>Click two noteboxes to connect them with yarn.</p>
-    </div>
-    <div id="confirmation-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-sm mx-4" style="font-family: 'Kalam', cursive;">
-            <p id="modal-text" class="text-lg text-gray-900 dark:text-gray-100 mb-6 text-center">Are you sure?</p>
-            <div class="flex justify-end space-x-4">
-                <button id="modal-cancel-btn" class="px-5 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">Cancel</button>
-                <button id="modal-confirm-btn" class="px-5 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Confirm</button>
+        <div id="controls" class="absolute top-4 left-4 z-20 bg-gray-800/80 backdrop-blur-sm text-white p-4 rounded-lg shadow-2xl border border-gray-600 flex flex-col space-y-3">
+            <h1 class="text-3xl text-center text-yellow-300">Controls</h1>
+            <div id="userInfo" class="text-xs text-center bg-gray-700 p-2 rounded-md break-all">Connecting...</div>
+            <button id="addNoteBtn" class="px-4 py-2 bg-yellow-400 text-gray-900 font-bold rounded-md hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg cursor-grab">Add Notebox</button>
+            <button id="connectModeBtn" class="px-4 py-2 bg-red-500 text-white font-bold rounded-md hover:bg-red-600 transition-transform transform hover:scale-105 shadow-lg">Connect Notebox</button>
+            <button id="deleteConnectionBtn" class="px-4 py-2 bg-purple-500 text-white font-bold rounded-md hover:bg-purple-600 transition-transform transform hover:scale-105 shadow-lg">Delete Connection</button>
+            <button id="deleteModeBtn" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-md hover:bg-gray-700 transition-transform transform hover:scale-105 shadow-lg">Delete Notebox</button>
+            <button id="toggleThemeBtn" class="px-4 py-2 bg-indigo-500 text-white font-bold rounded-md hover:bg-indigo-600 transition-transform transform hover:scale-105 shadow-lg">Toggle Theme</button>
+            <button id="clearBoardBtn" class="px-4 py-2 bg-blue-500 text-white font-bold rounded-md hover:bg-blue-600 transition-transform transform hover:scale-105 shadow-lg">Clear Board</button>
+        </div>
+        <div id="message-box" class="hidden absolute bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-lg shadow-xl z-30">
+            <p>Click two noteboxes to connect them with yarn.</p>
+        </div>
+        <div id="confirmation-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-sm mx-4" style="font-family: 'Kalam', cursive;">
+                <p id="modal-text" class="text-lg text-gray-900 dark:text-gray-100 mb-6 text-center">Are you sure?</p>
+                <div class="flex justify-end space-x-4">
+                    <button id="modal-cancel-btn" class="px-5 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">Cancel</button>
+                    <button id="modal-confirm-btn" class="px-5 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Confirm</button>
+                </div>
             </div>
         </div>
     </div>
+    <!-- Sign-in UI: Visible by default -->
+    <div id="signInWrapper" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;">
+        <button id="googleSignInBtn" class="px-4 py-2 bg-green-500 text-white font-bold rounded-md hover:bg-green-600 transition-transform transform hover:scale-105 shadow-lg">Sign in with Google</button>
+        <div id="accessDeniedMsg" style="display:none;color:red;margin-top:20px;font-weight:bold;">Access Denied: This board is private.</div>
+    </div>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const board = document.getElementById('board');
-        const panContainer = document.getElementById('pan-container');
-        const connectionsSvg = document.getElementById('connections-svg');
-        panContainer.appendChild(connectionsSvg);
-
+        const mainUI = document.getElementById('mainUI');
+        const signInWrapper = document.getElementById('signInWrapper');
+        const googleSignInBtn = document.getElementById('googleSignInBtn');
+        const accessDeniedMsg = document.getElementById('accessDeniedMsg');
+        const userInfoDiv = document.getElementById('userInfo');
         const addNoteBtn = document.getElementById('addNoteBtn');
         const connectModeBtn = document.getElementById('connectModeBtn');
         const deleteConnectionBtn = document.getElementById('deleteConnectionBtn');
         const deleteModeBtn = document.getElementById('deleteModeBtn');
         const toggleThemeBtn = document.getElementById('toggleThemeBtn');
         const clearBoardBtn = document.getElementById('clearBoardBtn');
-        const userInfoDiv = document.getElementById('userInfo');
+        const board = document.getElementById('board');
+        const panContainer = document.getElementById('pan-container');
+        const connectionsSvg = document.getElementById('connections-svg');
         const messageBox = document.getElementById('message-box');
         const confirmationModal = document.getElementById('confirmation-modal');
         const modalText = document.getElementById('modal-text');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
-        const googleSignInBtn = document.getElementById('googleSignInBtn');
-        const loadingDiv = document.getElementById('loading');
+
+        panContainer && panContainer.appendChild(connectionsSvg);
 
         let db, auth;
         let notesCollection;
@@ -234,6 +241,8 @@
         const MIN_NOTE_WIDTH = 120;
         const MIN_NOTE_HEIGHT = 100;
 
+        const allowedEmails = ["murali07dhar@gmail.com", "murali1608krishna@gmail.com"];
+
         async function initFirebase() {
             const firebaseConfig = {
                 apiKey: "AIzaSyB9YpRiG49sfmPYnYc9jtp_W7A0G58jPNY",
@@ -252,47 +261,31 @@
             connectionsCollection = collection(db, `${boardPath}/connections`);
 
             onAuthStateChanged(auth, user => {
-                loadingDiv.style.display = 'none'; // Hide loading when auth state known
-                if (user) {
+                if (user && user.email && allowedEmails.includes(user.email)) {
+                    mainUI.style.display = '';
+                    signInWrapper.style.display = 'none';
+                    accessDeniedMsg.style.display = 'none';
                     userId = user.uid;
-                    userInfoDiv.innerHTML = user.email
-                        ? `<strong>Detective:</strong><br>${user.email}`
-                        : `<strong>Detective ID:</strong><br>${userId}`;
-                    googleSignInBtn.style.display = 'none'; // Hide sign-in button
+                    userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
                     setupRealtimeListeners();
                 } else {
-                    userInfoDiv.textContent = 'Not signed in';
-                    googleSignInBtn.style.display = '';      // Show sign-in button
+                    mainUI.style.display = 'none';
+                    signInWrapper.style.display = 'flex';
+                    if (user && user.email && !allowedEmails.includes(user.email)) {
+                        accessDeniedMsg.style.display = '';
+                        auth.signOut();
+                    } else {
+                        accessDeniedMsg.style.display = 'none';
+                    }
                 }
             });
         }
 
-        async function signInWithGoogle() {
-            const provider = new GoogleAuthProvider();
-            try {
-                const result = await signInWithPopup(auth, provider);
-                const user = result.user;
-
-                // ✅ Allow only you & your friend
-                const allowedEmails = ["murali07dhar@gmail.com", "murali1608krishna@gmail.com"];
-                if (!allowedEmails.includes(user.email)) {
-                    alert("Access Denied: This board is private.");
-                    await auth.signOut();
-                    return;
-                }
-                userId = user.uid;
-                userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
-                googleSignInBtn.style.display = 'none'; // Hide sign-in button
-                setupRealtimeListeners();
-
-            } catch (error) {
-                console.error("Google Sign-In failed:", error);
-                userInfoDiv.textContent = 'Authentication Failed.';
-            }
-        }
-
         googleSignInBtn.addEventListener('click', () => {
-            signInWithGoogle();
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider).catch(err => {
+                // Optionally show error
+            });
         });
 
         function setupRealtimeListeners() {
@@ -724,6 +717,7 @@
             hideConfirmationModal();
         });
         modalCancelBtn.addEventListener('click', hideConfirmationModal);
+
         initFirebase();
     </script>
 </body>
