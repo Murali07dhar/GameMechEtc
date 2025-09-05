@@ -268,24 +268,36 @@
                     userId = user.uid;
                     userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
                     setupRealtimeListeners();
+                } else if (user && user.email && !allowedEmails.includes(user.email)) {
+                    mainUI.style.display = 'none';
+                    signInWrapper.style.display = 'flex';
+                    accessDeniedMsg.style.display = '';
+                    // DO NOT sign out here. Only sign out after popup closes.
                 } else {
                     mainUI.style.display = 'none';
                     signInWrapper.style.display = 'flex';
-                    if (user && user.email && !allowedEmails.includes(user.email)) {
-                        accessDeniedMsg.style.display = '';
-                        auth.signOut();
-                    } else {
-                        accessDeniedMsg.style.display = 'none';
-                    }
+                    accessDeniedMsg.style.display = 'none';
                 }
             });
         }
 
-        googleSignInBtn.addEventListener('click', () => {
+        googleSignInBtn.addEventListener('click', async () => {
             const provider = new GoogleAuthProvider();
-            signInWithPopup(auth, provider).catch(err => {
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                if (!allowedEmails.includes(user.email)) {
+                    accessDeniedMsg.style.display = '';
+                    // Wait a moment so user sees "Access Denied", then sign out
+                    setTimeout(() => {
+                        auth.signOut();
+                    }, 1500);
+                }
+            } catch (err) {
                 // Optionally show error
-            });
+                accessDeniedMsg.textContent = "Sign in failed: " + (err.message || "Unknown error");
+                accessDeniedMsg.style.display = '';
+            }
         });
 
         function setupRealtimeListeners() {
