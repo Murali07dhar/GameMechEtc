@@ -1,79 +1,262 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detective Notebox Board</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Kalam', cursive; background-color: #3D352E; }
-        .dark body { background-color: #1a202c; }
-        #mainUI { display: none; }
+        body {
+            font-family: 'Kalam', cursive;
+            overscroll-behavior: none;
+            background-color: #3D352E;
+            user-select: none;
+            transition: background-color 0.3s ease-in-out;
+        }
+        .dark body {
+            background-color: #1a202c;
+        }
+        #board {
+            background-image: url('https://www.transparenttextures.com/patterns/cork-wallet.png');
+            background-color: #C19A6B;
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            transition: background-color 0.3s ease-in-out;
+            cursor: grab;
+        }
+        #board.is-panning {
+            cursor: grabbing;
+        }
+        .dark #board {
+            background-image: url('https://www.transparenttextures.com/patterns/dark-wood.png');
+            background-color: #2D3748;
+        }
+        #pan-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5000px;
+            height: 5000px;
+            transform-origin: 0 0;
+        }
+        .note {
+            position: absolute;
+            width: 200px;
+            height: 150px;
+            padding: 20px 15px 15px 15px;
+            background-color: #FEFDE2;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
+            cursor: grab;
+            transition: box-shadow 0.1s ease-in-out, border-color 0.2s ease-in-out, background-color 0.3s ease-in-out;
+            border: 2px solid transparent;
+            display: flex;
+        }
+        .dark .note {
+            background-color: #4A5568;
+            border-color: #718096;
+        }
+        .note.is-deletable {
+            cursor: crosshair;
+            border-color: #E53E3E;
+            box-shadow: 0 0 20px rgba(229, 62, 62, 0.7);
+        }
+        .note.is-dragging, .note.is-rotating, .note.is-resizing {
+            cursor: grabbing;
+            z-index: 100;
+            box-shadow: 10px 10px 25px rgba(0,0,0,0.4);
+            transform-origin: center center;
+        }
+        .note-pin {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            background-color: #E53E3E;
+            border-radius: 50%;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+            border: 2px solid #C53030;
+            cursor: crosshair;
+            z-index: 2;
+        }
+        .note-content {
+            flex-grow: 1;
+            font-size: 18px;
+            line-height: 1.4;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            transition: color 0.3s ease-in-out;
+        }
+        .dark .note-content {
+            color: #F7FAFC;
+        }
+        .note-textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            resize: none;
+            outline: none;
+            font-family: 'Kalam', cursive;
+            font-size: 18px;
+            line-height: 1.4;
+            color: #1a202c;
+        }
+        .dark .note-textarea {
+            color: #F7FAFC;
+        }
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 0 20px 20px;
+            border-color: transparent transparent rgba(0,0,0,0.2) transparent;
+            cursor: nwse-resize;
+            z-index: 2;
+        }
+        #connections-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5000px;
+            height: 5000px;
+            pointer-events: none;
+        }
+        #connections-svg.is-active {
+            pointer-events: auto;
+        }
+        .connection-line {
+            transition: stroke-width 0.2s ease, stroke 0.2s ease;
+            pointer-events: none;
+        }
+        .connection-line.is-deletable {
+            pointer-events: auto;
+            cursor: crosshair;
+        }
+        .connection-line.is-deletable:hover {
+            stroke: #E53E3E !important;
+            stroke-width: 8 !important;
+        }
+        #controls {
+            font-family: 'Permanent Marker', cursive;
+        }
+        #board.ring {
+            box-shadow: 0 0 0 6px #facc15, inset 0 0 20px rgba(0,0,0,0.5);
+        }
+        /* Password modal styles */
+        #password-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
-<body>
-    <!-- Main UI: Hidden by default -->
-    <div id="mainUI">
-        <div id="board">
-            <div id="pan-container"><svg id="connections-svg"></svg></div>
+<body class="w-screen h-screen m-0 p-0">
+    <!-- Password Modal -->
+    <div id="password-modal">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-xs mx-4 flex flex-col items-center" style="font-family: 'Kalam', cursive;">
+            <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">Enter Password</h2>
+            <input id="password-input" type="password" class="mb-4 px-4 py-2 rounded border border-gray-400 w-full text-lg" placeholder="Password" autofocus>
+            <button id="password-submit" class="px-5 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors w-full font-bold">Access</button>
+            <div id="password-error" class="text-red-500 mt-2 hidden text-center">Incorrect password. Try again.</div>
         </div>
-        <div id="controls" class="absolute top-4 left-4 z-20 bg-gray-800/80 backdrop-blur-sm text-white p-4 rounded-lg shadow-2xl border border-gray-600 flex flex-col space-y-3">
-            <h1 class="text-3xl text-center text-yellow-300">Controls</h1>
-            <div id="userInfo" class="text-xs text-center bg-gray-700 p-2 rounded-md break-all">Connecting...</div>
-            <button id="addNoteBtn" class="px-4 py-2 bg-yellow-400 text-gray-900 font-bold rounded-md hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg cursor-grab">Add Notebox</button>
-            <button id="connectModeBtn" class="px-4 py-2 bg-red-500 text-white font-bold rounded-md hover:bg-red-600 transition-transform transform hover:scale-105 shadow-lg">Connect Notebox</button>
-            <button id="deleteConnectionBtn" class="px-4 py-2 bg-purple-500 text-white font-bold rounded-md hover:bg-purple-600 transition-transform transform hover:scale-105 shadow-lg">Delete Connection</button>
-            <button id="deleteModeBtn" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-md hover:bg-gray-700 transition-transform transform hover:scale-105 shadow-lg">Delete Notebox</button>
-            <button id="toggleThemeBtn" class="px-4 py-2 bg-indigo-500 text-white font-bold rounded-md hover:bg-indigo-600 transition-transform transform hover:scale-105 shadow-lg">Toggle Theme</button>
-            <button id="clearBoardBtn" class="px-4 py-2 bg-blue-500 text-white font-bold rounded-md hover:bg-blue-600 transition-transform transform hover:scale-105 shadow-lg">Clear Board</button>
+    </div>
+    <div id="board" class="w-full h-full">
+        <div id="pan-container">
+            <svg id="connections-svg"></svg>
         </div>
-        <div id="message-box" class="hidden absolute bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-lg shadow-xl z-30">
-            <p>Click two noteboxes to connect them with yarn.</p>
-        </div>
-        <div id="confirmation-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-sm mx-4" style="font-family: 'Kalam', cursive;">
-                <p id="modal-text" class="text-lg text-gray-900 dark:text-gray-100 mb-6 text-center">Are you sure?</p>
-                <div class="flex justify-end space-x-4">
-                    <button id="modal-cancel-btn" class="px-5 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">Cancel</button>
-                    <button id="modal-confirm-btn" class="px-5 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Confirm</button>
-                </div>
+    </div>
+    <div id="controls" class="absolute top-4 left-4 z-20 bg-gray-800/80 backdrop-blur-sm text-white p-4 rounded-lg shadow-2xl border border-gray-600 flex flex-col space-y-3">
+        <h1 class="text-3xl text-center text-yellow-300">Controls</h1>
+        <div id="userInfo" class="text-xs text-center bg-gray-700 p-2 rounded-md break-all">Connecting...</div>
+        <button id="addNoteBtn" class="px-4 py-2 bg-yellow-400 text-gray-900 font-bold rounded-md hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg cursor-grab">Add Notebox</button>
+        <button id="connectModeBtn" class="px-4 py-2 bg-red-500 text-white font-bold rounded-md hover:bg-red-600 transition-transform transform hover:scale-105 shadow-lg">Connect Notebox</button>
+        <button id="deleteConnectionBtn" class="px-4 py-2 bg-purple-500 text-white font-bold rounded-md hover:bg-purple-600 transition-transform transform hover:scale-105 shadow-lg">Delete Connection</button>
+        <button id="deleteModeBtn" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-md hover:bg-gray-700 transition-transform transform hover:scale-105 shadow-lg">Delete Notebox</button>
+        <button id="toggleThemeBtn" class="px-4 py-2 bg-indigo-500 text-white font-bold rounded-md hover:bg-indigo-600 transition-transform transform hover:scale-105 shadow-lg">Toggle Theme</button>
+        <button id="clearBoardBtn" class="px-4 py-2 bg-blue-500 text-white font-bold rounded-md hover:bg-blue-600 transition-transform transform hover:scale-105 shadow-lg">Clear Board</button>
+    </div>
+    <div id="message-box" class="hidden absolute bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-lg shadow-xl z-30">
+        <p>Click two noteboxes to connect them with yarn.</p>
+    </div>
+    <div id="confirmation-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-sm mx-4" style="font-family: 'Kalam', cursive;">
+            <p id="modal-text" class="text-lg text-gray-900 dark:text-gray-100 mb-6 text-center">Are you sure?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="modal-cancel-btn" class="px-5 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">Cancel</button>
+                <button id="modal-confirm-btn" class="px-5 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Confirm</button>
             </div>
         </div>
     </div>
-    <!-- Sign-in UI: Visible by default -->
-    <div id="signInWrapper" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;">
-        <button id="googleSignInBtn" style="margin-bottom:20px;" class="px-4 py-2 bg-green-500 text-white font-bold rounded-md hover:bg-green-600 transition-transform transform hover:scale-105 shadow-lg">Sign in with Google</button>
-        <div id="accessDeniedMsg" style="display:none;color:red;font-weight:bold;">Access Denied: This board is private.</div>
-    </div>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- PASSWORD PROTECTION ONLY ---
+        const passwordModal = document.getElementById('password-modal');
+        const passwordInput = document.getElementById('password-input');
+        const passwordSubmit = document.getElementById('password-submit');
+        const passwordError = document.getElementById('password-error');
+        const CORRECT_PASSWORD = "makuta";
 
-        const allowedEmails = ["murali07dhar@gmail.com", "murali1608krishna@gmail.com"];
-        const mainUI = document.getElementById('mainUI');
-        const signInWrapper = document.getElementById('signInWrapper');
-        const googleSignInBtn = document.getElementById('googleSignInBtn');
-        const accessDeniedMsg = document.getElementById('accessDeniedMsg');
-        const userInfoDiv = document.getElementById('userInfo');
+        function unlockBoard() {
+            passwordModal.style.display = "none";
+        }
+
+        passwordSubmit.addEventListener('click', () => {
+            if (passwordInput.value === CORRECT_PASSWORD) {
+                unlockBoard();
+            } else {
+                passwordError.classList.remove('hidden');
+                passwordInput.value = "";
+                passwordInput.focus();
+            }
+        });
+
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === "Enter") passwordSubmit.click();
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            passwordInput.focus();
+        });
+
+        // --- REST OF YOUR EXISTING SCRIPT WITH UPDATED FIREBASE CONFIG ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const board = document.getElementById('board');
+        const panContainer = document.getElementById('pan-container');
+        const connectionsSvg = document.getElementById('connections-svg');
+        panContainer.appendChild(connectionsSvg);
+
         const addNoteBtn = document.getElementById('addNoteBtn');
         const connectModeBtn = document.getElementById('connectModeBtn');
         const deleteConnectionBtn = document.getElementById('deleteConnectionBtn');
         const deleteModeBtn = document.getElementById('deleteModeBtn');
         const toggleThemeBtn = document.getElementById('toggleThemeBtn');
         const clearBoardBtn = document.getElementById('clearBoardBtn');
-        const board = document.getElementById('board');
-        const panContainer = document.getElementById('pan-container');
-        const connectionsSvg = document.getElementById('connections-svg');
+        const userInfoDiv = document.getElementById('userInfo');
         const messageBox = document.getElementById('message-box');
         const confirmationModal = document.getElementById('confirmation-modal');
         const modalText = document.getElementById('modal-text');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
-
-        panContainer && panContainer.appendChild(connectionsSvg);
 
         let db, auth;
         let notesCollection;
@@ -100,59 +283,40 @@
         const MIN_NOTE_HEIGHT = 100;
 
         async function initFirebase() {
+            // --- UPDATED FIREBASE CONFIG ---
             const firebaseConfig = {
-                apiKey: "AIzaSyB9YpRiG49sfmPYnYc9jtp_W7A0G58jPNY",
-                authDomain: "storyplannerv2.firebaseapp.com",
-                projectId: "storyplannerv2",
-                storageBucket: "storyplannerv2.firebasestorage.app",
-                messagingSenderId: "815522734935",
-                appId: "1:815522734935:web:a1b125ce089e9e0aaa9412"
+                apiKey: "AIzaSyBogkugxEjdDQZCi6LLyfFqB9l3P63lvZs",
+                authDomain: "gamemechv1.firebaseapp.com",
+                projectId: "gamemechv1",
+                storageBucket: "gamemechv1.firebasestorage.app",
+                messagingSenderId: "421350572822",
+                appId: "1:421350572822:web:b306f7cde07622613d8637"
             };
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
 
-            const boardPath = `/boards/main-detective-board`;
+            const boardPath = `/boards/main-detective-board`; 
             notesCollection = collection(db, `${boardPath}/notes`);
             connectionsCollection = collection(db, `${boardPath}/connections`);
 
             onAuthStateChanged(auth, user => {
-                if (user && user.email && allowedEmails.includes(user.email)) {
-                    mainUI.style.display = '';
-                    signInWrapper.style.display = 'none';
-                    accessDeniedMsg.style.display = 'none';
+                if (user) {
                     userId = user.uid;
-                    userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
+                    userInfoDiv.innerHTML = `<strong>Detective ID:</strong><br>${userId}`;
                     setupRealtimeListeners();
-                } else if (user && user.email && !allowedEmails.includes(user.email)) {
-                    mainUI.style.display = 'none';
-                    signInWrapper.style.display = 'flex';
-                    accessDeniedMsg.style.display = '';
-                    // Do NOT sign out here!
                 } else {
-                    mainUI.style.display = 'none';
-                    signInWrapper.style.display = 'flex';
-                    accessDeniedMsg.style.display = 'none';
+                    userInfoDiv.textContent = 'Authenticating...';
                 }
             });
-        }
 
-        googleSignInBtn.addEventListener('click', async () => {
-            const provider = new GoogleAuthProvider();
             try {
-                const result = await signInWithPopup(auth, provider);
-                const user = result.user;
-                if (!allowedEmails.includes(user.email)) {
-                    accessDeniedMsg.style.display = '';
-                    setTimeout(() => {
-                        auth.signOut();
-                    }, 2000);
-                }
-            } catch (err) {
-                accessDeniedMsg.textContent = "Sign in failed: " + (err.message || "Unknown error");
-                accessDeniedMsg.style.display = '';
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                userInfoDiv.textContent = 'Authentication Failed.';
             }
-        });
+        }
 
         function setupRealtimeListeners() {
             onSnapshot(notesCollection, (snapshot) => {
@@ -173,13 +337,13 @@
 
             onSnapshot(connectionsCollection, (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
-                   const connData = { id: change.doc.id, ...change.doc.data() };
-                   if (change.type === "added" || change.type === "modified") {
-                       localConnections.set(connData.id, connData);
-                   }
-                   if(change.type === "removed") {
-                       localConnections.delete(connData.id);
-                   }
+                     const connData = { id: change.doc.id, ...change.doc.data() };
+                     if (change.type === "added" || change.type === "modified") {
+                         localConnections.set(connData.id, connData);
+                     }
+                     if(change.type === "removed") {
+                         localConnections.delete(connData.id);
+                     }
                 });
                 renderConnections();
             });
@@ -583,7 +747,6 @@
             hideConfirmationModal();
         });
         modalCancelBtn.addEventListener('click', hideConfirmationModal);
-
         initFirebase();
     </script>
 </body>
