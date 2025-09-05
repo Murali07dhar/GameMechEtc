@@ -164,6 +164,7 @@
     <div id="controls" class="absolute top-4 left-4 z-20 bg-gray-800/80 backdrop-blur-sm text-white p-4 rounded-lg shadow-2xl border border-gray-600 flex flex-col space-y-3">
         <h1 class="text-3xl text-center text-yellow-300">Controls</h1>
         <div id="userInfo" class="text-xs text-center bg-gray-700 p-2 rounded-md break-all">Connecting...</div>
+        <button id="googleSignInBtn" class="px-4 py-2 bg-green-500 text-white font-bold rounded-md hover:bg-green-600 transition-transform transform hover:scale-105 shadow-lg">Sign in with Google</button>
         <button id="addNoteBtn" class="px-4 py-2 bg-yellow-400 text-gray-900 font-bold rounded-md hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg cursor-grab">Add Notebox</button>
         <button id="connectModeBtn" class="px-4 py-2 bg-red-500 text-white font-bold rounded-md hover:bg-red-600 transition-transform transform hover:scale-105 shadow-lg">Connect Notebox</button>
         <button id="deleteConnectionBtn" class="px-4 py-2 bg-purple-500 text-white font-bold rounded-md hover:bg-purple-600 transition-transform transform hover:scale-105 shadow-lg">Delete Connection</button>
@@ -185,7 +186,7 @@
     </div>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const board = document.getElementById('board');
@@ -205,6 +206,7 @@
         const modalText = document.getElementById('modal-text');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const googleSignInBtn = document.getElementById('googleSignInBtn');
 
         let db, auth;
         let notesCollection;
@@ -250,42 +252,45 @@
             onAuthStateChanged(auth, user => {
                 if (user) {
                     userId = user.uid;
-                    userInfoDiv.innerHTML = `<strong>Detective ID:</strong><br>${userId}`;
+                    userInfoDiv.innerHTML = user.email
+                        ? `<strong>Detective:</strong><br>${user.email}`
+                        : `<strong>Detective ID:</strong><br>${userId}`;
+                    googleSignInBtn.style.display = 'none'; // Hide sign-in button
                     setupRealtimeListeners();
                 } else {
-                    userInfoDiv.textContent = 'Authenticating...';
+                    userInfoDiv.textContent = 'Not signed in';
+                    googleSignInBtn.style.display = ''; // Show sign-in button
                 }
             });
-
-            import { GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-async function signInWithGoogle() {
-    const provider = new GoogleAuthProvider();
-    try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-
-        // ✅ Allow only you & your friend
-        const allowedEmails = ["murali07dhar@gmail.com", "murali1608krishna@gmail.com"];
-        if (!allowedEmails.includes(user.email)) {
-            alert("Access Denied: This board is private.");
-            await auth.signOut();
-            return;
         }
 
-        userId = user.uid;
-        userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
-        setupRealtimeListeners();
+        async function signInWithGoogle() {
+            const provider = new GoogleAuthProvider();
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
 
-    } catch (error) {
-        console.error("Google Sign-In failed:", error);
-        userInfoDiv.textContent = 'Authentication Failed.';
-    }
-}
+                // ✅ Allow only you & your friend
+                const allowedEmails = ["murali07dhar@gmail.com", "murali1608krishna@gmail.com"];
+                if (!allowedEmails.includes(user.email)) {
+                    alert("Access Denied: This board is private.");
+                    await auth.signOut();
+                    return;
+                }
+                userId = user.uid;
+                userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
+                googleSignInBtn.style.display = 'none'; // Hide sign-in button
+                setupRealtimeListeners();
 
-signInWithGoogle();
-
+            } catch (error) {
+                console.error("Google Sign-In failed:", error);
+                userInfoDiv.textContent = 'Authentication Failed.';
+            }
         }
+
+        googleSignInBtn.addEventListener('click', () => {
+            signInWithGoogle();
+        });
 
         function setupRealtimeListeners() {
             onSnapshot(notesCollection, (snapshot) => {
@@ -720,4 +725,3 @@ signInWithGoogle();
     </script>
 </body>
 </html>
-
