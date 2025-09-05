@@ -257,12 +257,34 @@
                 }
             });
 
-            try {
-                await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Authentication failed:", error);
-                userInfoDiv.textContent = 'Authentication Failed.';
-            }
+            import { GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+async function signInWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+
+        // ✅ Allow only you & your friend
+        const allowedEmails = ["murali07dhar@gmail.com", "murali1608krishna@gmail.com"];
+        if (!allowedEmails.includes(user.email)) {
+            alert("Access Denied: This board is private.");
+            await auth.signOut();
+            return;
+        }
+
+        userId = user.uid;
+        userInfoDiv.innerHTML = `<strong>Detective:</strong><br>${user.email}`;
+        setupRealtimeListeners();
+
+    } catch (error) {
+        console.error("Google Sign-In failed:", error);
+        userInfoDiv.textContent = 'Authentication Failed.';
+    }
+}
+
+signInWithGoogle();
+
         }
 
         function setupRealtimeListeners() {
@@ -698,3 +720,4 @@
     </script>
 </body>
 </html>
+
